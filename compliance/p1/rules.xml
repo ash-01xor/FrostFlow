@@ -1,0 +1,195 @@
+<?xml version='1.0' encoding='utf-8'?>
+<dcrgraph title="P1 shipment preparation compliance — Ashvanth" dataTypesStatus="hide">
+  <specification>
+    <resources>
+      <events>
+        <event id="ShipmentCreated">
+          <custom>
+            <eventData />
+            <visualization>
+              <location xLoc="60" yLoc="300" />
+              <size width="130" height="150" />
+            </visualization>
+          </custom>
+        </event>
+        <event id="StockChecked">
+          <custom>
+            <eventData />
+            <visualization>
+              <location xLoc="320" yLoc="300" />
+              <size width="130" height="150" />
+            </visualization>
+          </custom>
+        </event>
+        <event id="StockUnavailable">
+          <custom>
+            <eventData />
+            <visualization>
+              <location xLoc="580" yLoc="580" />
+              <size width="130" height="150" />
+            </visualization>
+          </custom>
+        </event>
+        <event id="StockReplenished">
+          <custom>
+            <eventData />
+            <visualization>
+              <location xLoc="320" yLoc="860" />
+              <size width="130" height="150" />
+            </visualization>
+          </custom>
+        </event>
+        <event id="StockAllocated">
+          <custom>
+            <eventData />
+            <visualization>
+              <location xLoc="580" yLoc="60" />
+              <size width="130" height="150" />
+            </visualization>
+          </custom>
+        </event>
+        <event id="TransportAssigned">
+          <custom>
+            <eventData />
+            <visualization>
+              <location xLoc="840" yLoc="60" />
+              <size width="130" height="150" />
+            </visualization>
+          </custom>
+        </event>
+        <event id="LoadingVerified">
+          <custom>
+            <eventData />
+            <visualization>
+              <location xLoc="1100" yLoc="60" />
+              <size width="130" height="150" />
+            </visualization>
+          </custom>
+        </event>
+        <event id="ShipmentDispatched">
+          <custom>
+            <eventData />
+            <visualization>
+              <location xLoc="1360" yLoc="60" />
+              <size width="130" height="150" />
+            </visualization>
+          </custom>
+        </event>
+        <event id="ShipmentCancelled">
+          <custom>
+            <eventData />
+            <visualization>
+              <location xLoc="840" yLoc="580" />
+              <size width="130" height="150" />
+            </visualization>
+          </custom>
+        </event>
+      </events>
+      <labels>
+        <label id="ShipmentCreated" />
+        <label id="StockChecked" />
+        <label id="StockUnavailable" />
+        <label id="StockReplenished" />
+        <label id="StockAllocated" />
+        <label id="TransportAssigned" />
+        <label id="LoadingVerified" />
+        <label id="ShipmentDispatched" />
+        <label id="ShipmentCancelled" />
+      </labels>
+      <labelMappings>
+        <labelMapping eventId="ShipmentCreated" labelId="ShipmentCreated" />
+        <labelMapping eventId="StockChecked" labelId="StockChecked" />
+        <labelMapping eventId="StockUnavailable" labelId="StockUnavailable" />
+        <labelMapping eventId="StockReplenished" labelId="StockReplenished" />
+        <labelMapping eventId="StockAllocated" labelId="StockAllocated" />
+        <labelMapping eventId="TransportAssigned" labelId="TransportAssigned" />
+        <labelMapping eventId="LoadingVerified" labelId="LoadingVerified" />
+        <labelMapping eventId="ShipmentDispatched" labelId="ShipmentDispatched" />
+        <labelMapping eventId="ShipmentCancelled" labelId="ShipmentCancelled" />
+      </labelMappings>
+      <subProcesses />
+    </resources>
+    <constraints>
+      <conditions>
+        <condition sourceId="ShipmentCreated" targetId="StockChecked" />
+        <condition sourceId="StockChecked" targetId="StockUnavailable" />
+        <condition sourceId="StockChecked" targetId="StockAllocated" />
+        <condition sourceId="StockUnavailable" targetId="StockReplenished" />
+        <condition sourceId="StockUnavailable" targetId="ShipmentCancelled" />
+        <condition sourceId="StockAllocated" targetId="TransportAssigned" />
+        <condition sourceId="StockAllocated" targetId="LoadingVerified" />
+        <condition sourceId="TransportAssigned" targetId="LoadingVerified" />
+        <condition sourceId="StockAllocated" targetId="ShipmentDispatched" />
+        <condition sourceId="LoadingVerified" targetId="ShipmentDispatched" />
+      </conditions>
+      <responses>
+        <response sourceId="ShipmentCreated" targetId="ShipmentDispatched" />
+        <response sourceId="StockUnavailable" targetId="StockReplenished" />
+        <response sourceId="StockReplenished" targetId="StockChecked" />
+      </responses>
+      <includes>
+        <include sourceId="StockUnavailable" targetId="StockReplenished" />
+        <include sourceId="StockUnavailable" targetId="ShipmentCancelled" />
+        <include sourceId="StockReplenished" targetId="StockChecked" />
+        <include sourceId="StockReplenished" targetId="StockUnavailable" />
+      </includes>
+      <excludes>
+        <exclude sourceId="ShipmentCreated" targetId="ShipmentCreated" />
+        <exclude sourceId="StockChecked" targetId="StockChecked" />
+        <exclude sourceId="StockUnavailable" targetId="StockUnavailable" />
+        <exclude sourceId="StockReplenished" targetId="StockReplenished" />
+        <exclude sourceId="StockAllocated" targetId="StockAllocated" />
+        <exclude sourceId="TransportAssigned" targetId="TransportAssigned" />
+        <exclude sourceId="LoadingVerified" targetId="LoadingVerified" />
+        <exclude sourceId="ShipmentDispatched" targetId="ShipmentDispatched" />
+        <exclude sourceId="ShipmentCancelled" targetId="ShipmentCancelled" />
+        <exclude sourceId="StockReplenished" targetId="ShipmentCancelled" />
+        <exclude sourceId="StockAllocated" targetId="StockUnavailable" />
+        <exclude sourceId="StockAllocated" targetId="StockReplenished" />
+        <exclude sourceId="StockAllocated" targetId="ShipmentCancelled" />
+        <exclude sourceId="StockAllocated" targetId="StockChecked" />
+        <exclude sourceId="ShipmentDispatched" targetId="ShipmentCreated" />
+        <exclude sourceId="ShipmentDispatched" targetId="StockChecked" />
+        <exclude sourceId="ShipmentDispatched" targetId="StockUnavailable" />
+        <exclude sourceId="ShipmentDispatched" targetId="StockReplenished" />
+        <exclude sourceId="ShipmentDispatched" targetId="StockAllocated" />
+        <exclude sourceId="ShipmentDispatched" targetId="TransportAssigned" />
+        <exclude sourceId="ShipmentDispatched" targetId="LoadingVerified" />
+        <exclude sourceId="ShipmentDispatched" targetId="ShipmentCancelled" />
+        <exclude sourceId="ShipmentCancelled" targetId="ShipmentCreated" />
+        <exclude sourceId="ShipmentCancelled" targetId="StockChecked" />
+        <exclude sourceId="ShipmentCancelled" targetId="StockUnavailable" />
+        <exclude sourceId="ShipmentCancelled" targetId="StockReplenished" />
+        <exclude sourceId="ShipmentCancelled" targetId="StockAllocated" />
+        <exclude sourceId="ShipmentCancelled" targetId="TransportAssigned" />
+        <exclude sourceId="ShipmentCancelled" targetId="LoadingVerified" />
+        <exclude sourceId="ShipmentCancelled" targetId="ShipmentDispatched" />
+      </excludes>
+      <milestones>
+        <milestone sourceId="StockReplenished" targetId="StockAllocated" />
+        <milestone sourceId="StockReplenished" targetId="TransportAssigned" />
+        <milestone sourceId="StockReplenished" targetId="LoadingVerified" />
+        <milestone sourceId="StockReplenished" targetId="ShipmentDispatched" />
+        <milestone sourceId="StockChecked" targetId="StockAllocated" />
+        <milestone sourceId="StockChecked" targetId="StockUnavailable" />
+      </milestones>
+    </constraints>
+  </specification>
+  <runtime>
+    <marking>
+      <executed />
+      <included>
+        <event id="ShipmentCreated" />
+        <event id="StockChecked" />
+        <event id="StockUnavailable" />
+        <event id="StockAllocated" />
+        <event id="TransportAssigned" />
+        <event id="LoadingVerified" />
+        <event id="ShipmentDispatched" />
+      </included>
+      <pendingResponses>
+        <event id="ShipmentCreated" />
+      </pendingResponses>
+    </marking>
+  </runtime>
+</dcrgraph>

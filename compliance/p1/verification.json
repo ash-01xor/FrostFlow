@@ -1,0 +1,304 @@
+{
+  "observedAt": "2026-11-01T12:35:00.461919+00:00",
+  "evidenceType": "real Zeebe execution and application activity logs",
+  "datasetVersion": 3,
+  "initialInventory": {
+    "available": 100,
+    "datasetVersion": 3,
+    "products": [
+      {
+        "available": 20,
+        "batchId": "DEMO-MILK-001",
+        "initialCrates": 20,
+        "packDescription": "1 litre carton",
+        "packsPerCrate": 12,
+        "productId": "PRD-001",
+        "productName": "Fresh milk",
+        "quantityUnit": "crate",
+        "temperatureProfileId": "CHILLED-DEMO"
+      },
+      {
+        "available": 20,
+        "batchId": "DEMO-YOGHURT-001",
+        "initialCrates": 20,
+        "packDescription": "500 gram tub",
+        "packsPerCrate": 12,
+        "productId": "PRD-002",
+        "productName": "Plain yoghurt",
+        "quantityUnit": "crate",
+        "temperatureProfileId": "CHILLED-DEMO"
+      },
+      {
+        "available": 20,
+        "batchId": "DEMO-CHEESE-001",
+        "initialCrates": 20,
+        "packDescription": "250 gram sealed pack",
+        "packsPerCrate": 12,
+        "productId": "PRD-003",
+        "productName": "Fresh cheese",
+        "quantityUnit": "crate",
+        "temperatureProfileId": "CHILLED-DEMO"
+      },
+      {
+        "available": 20,
+        "batchId": "DEMO-CHICKEN-001",
+        "initialCrates": 20,
+        "packDescription": "500 gram sealed pack",
+        "packsPerCrate": 12,
+        "productId": "PRD-004",
+        "productName": "Raw chicken breast",
+        "quantityUnit": "crate",
+        "temperatureProfileId": "CHILLED-DEMO"
+      },
+      {
+        "available": 20,
+        "batchId": "DEMO-SALAD-001",
+        "initialCrates": 20,
+        "packDescription": "250 gram sealed bag",
+        "packsPerCrate": 12,
+        "productId": "PRD-005",
+        "productName": "Prepared salad",
+        "quantityUnit": "crate",
+        "temperatureProfileId": "CHILLED-DEMO"
+      }
+    ],
+    "quantityUnit": "crate",
+    "shipmentCount": 0
+  },
+  "finalInventory": {
+    "available": 80,
+    "datasetVersion": 3,
+    "products": [
+      {
+        "available": 0,
+        "batchId": "DEMO-MILK-001",
+        "initialCrates": 20,
+        "packDescription": "1 litre carton",
+        "packsPerCrate": 12,
+        "productId": "PRD-001",
+        "productName": "Fresh milk",
+        "quantityUnit": "crate",
+        "temperatureProfileId": "CHILLED-DEMO"
+      },
+      {
+        "available": 20,
+        "batchId": "DEMO-YOGHURT-001",
+        "initialCrates": 20,
+        "packDescription": "500 gram tub",
+        "packsPerCrate": 12,
+        "productId": "PRD-002",
+        "productName": "Plain yoghurt",
+        "quantityUnit": "crate",
+        "temperatureProfileId": "CHILLED-DEMO"
+      },
+      {
+        "available": 20,
+        "batchId": "DEMO-CHEESE-001",
+        "initialCrates": 20,
+        "packDescription": "250 gram sealed pack",
+        "packsPerCrate": 12,
+        "productId": "PRD-003",
+        "productName": "Fresh cheese",
+        "quantityUnit": "crate",
+        "temperatureProfileId": "CHILLED-DEMO"
+      },
+      {
+        "available": 20,
+        "batchId": "DEMO-CHICKEN-001",
+        "initialCrates": 20,
+        "packDescription": "500 gram sealed pack",
+        "packsPerCrate": 12,
+        "productId": "PRD-004",
+        "productName": "Raw chicken breast",
+        "quantityUnit": "crate",
+        "temperatureProfileId": "CHILLED-DEMO"
+      },
+      {
+        "available": 20,
+        "batchId": "DEMO-SALAD-001",
+        "initialCrates": 20,
+        "packDescription": "250 gram sealed bag",
+        "packsPerCrate": 12,
+        "productId": "PRD-005",
+        "productName": "Prepared salad",
+        "quantityUnit": "crate",
+        "temperatureProfileId": "CHILLED-DEMO"
+      }
+    ],
+    "quantityUnit": "crate",
+    "shipmentCount": 3
+  },
+  "modelSha256": "a7e9610eaae4a288cae629c84aa06abeec4d9a2eb37265228b48b37a85a6844f",
+  "bpmnSha256": {
+    "bpmn/shipment_preparation.bpmn": "ff7cca3684bb5c41e425dd3666abdc05c146fb0ac12f540c80019b16d4fe3efa",
+    "bpmn/transport.bpmn": "dd929513efb3b155bc50141abb6ec282fdfc044099bd313a74c80052d5f2cdaa"
+  },
+  "sourceSha256": {
+    "deployer/app.py": "9cdb35e5bea9a22c42e35d1cabd491de7346c3e6dd6c68efe24d22679f090295",
+    "deployer/registry.py": "e4268a10d2f87052d6f5c8dea181c3275ea2ac86686160ea6364316c9288a6be",
+    "deployer/catalog.json": "805f082c60f4c54551c506bc5e5ee5864ddc0001de0a822169dd970571714860",
+    "compliance/check.py": "eb2421c8b29795b39e2e415b75abd560c1448749211af4083bca989a270fe2e6",
+    "tools/demo.py": "00de0a7262d3fc9dd1a0b6ed18151a2c7352cb65224a23857c0b8fdf46ecf4f4",
+    "stage_tests/check_stage1.py": "b4be9d2733276674bc3be7669ab4360996c3fb047884c2be139090e7cfd49804",
+    "deployer/requirements.txt": "700b7496391e5f60825686724f9d9088504b075e3d51db6de2a8279df518ae29",
+    "docker-compose.yml": "66feea1ccbe84a10e211ab181a2f218ca22f03fb25c1787017e437c6a474a061"
+  },
+  "executionLogSha256": "d0ab6b41d4622086b646f7f7d5322e0a5d2b26e62989b2ddcf01901ef9708a9d",
+  "cases": {
+    "p1-b9814f2e-1": {
+      "handoffStatus": "ACKNOWLEDGED",
+      "p2ProcessInstanceKey": "2251799813685364",
+      "processInstanceKey": "2251799813685305",
+      "state": "DISPATCHED",
+      "stockAttempt": 1
+    },
+    "p1-b9814f2e-2": {
+      "processInstanceKey": "2251799813685397",
+      "state": "CANCELLED",
+      "stockAttempt": 1
+    },
+    "p1-b9814f2e-3": {
+      "handoffStatus": "ACKNOWLEDGED",
+      "p2ProcessInstanceKey": "2251799813685542",
+      "processInstanceKey": "2251799813685438",
+      "state": "DISPATCHED",
+      "stockAttempt": 3
+    }
+  },
+  "compliance": {
+    "p1-b9814f2e-1": {
+      "valid": true,
+      "accepting": true,
+      "pending": []
+    },
+    "p1-b9814f2e-2": {
+      "valid": true,
+      "accepting": true,
+      "pending": []
+    },
+    "p1-b9814f2e-3": {
+      "valid": true,
+      "accepting": true,
+      "pending": []
+    }
+  },
+  "deliberatelyInvalidTrace": {
+    "valid": false,
+    "accepting": false,
+    "violationIndex": 4,
+    "event": "ShipmentDispatched",
+    "reason": "activity is excluded"
+  },
+  "checks": [
+    "shortage wait",
+    "premature actions blocked",
+    "cancellation ends P1 and releases vehicle",
+    "insufficient supply rechecks",
+    "replenishment deduplicated",
+    "product/batch identity exported to P2 and P1 activities",
+    "other four products retain 20 crates each",
+    "two dispatched P1 completions",
+    "two distinct P2 instances waiting",
+    "duplicate P2 start suppressed",
+    "actual P1 logs conform and are accepting",
+    "deliberately invalid trace rejected"
+  ],
+  "processDoctor": {
+    "url": "https://processdoctor.compute.dtu.dk/",
+    "checkedAt": "2026-11-01T13:00:15.054Z",
+    "method": "Actual website checked in isolated headless Chromium/Puppeteer",
+    "workflow": "Home > Conformance > Open Model > Open DCR Solution XML > Upload Log > Check!",
+    "coverageThreshold": 100,
+    "importedEvents": 9,
+    "importedRelations": 53,
+    "modelFile": "compliance/p1/rules.xml",
+    "logFile": "compliance/p1/execution-log.xes",
+    "realExecutionLog": {
+      "Conforming": 3,
+      "Partially Violating": 0,
+      "Violating": 0,
+      "Total Structural Violations": 0
+    },
+    "syntheticNegativeControl": {
+      "source": "compliance/p1/invalid-trace.json",
+      "method": "Converted separately to temporary XES; excluded from real execution log",
+      "result": {
+        "Conforming": 0,
+        "Partially Violating": 1,
+        "Violating": 0,
+        "Total Structural Violations": 1
+      }
+    },
+    "screenshots": {
+      "conforming": {
+        "file": "compliance/p1/processdoctor-conforming.png",
+        "sha256": "d76e143869317ddb54c279475ea80bc391f63364b6e5d9b6265f7531ef8c55d6"
+      },
+      "negative": {
+        "file": "compliance/p1/processdoctor-negative.png",
+        "sha256": "f7ddaa4f9dcec7690412d35d3978fe8d97aa2f3480ef60fea172a158bae75ebd"
+      }
+    },
+    "studentReproduction": "Recorded by Codex; responsible student should reproduce and explain the results",
+    "modelSha256AtCheck": "e9a8dc1f8be9c829a09d5b7f14925ed74e008f7b4626c3134efc3f5b37e38a42"
+  },
+  "persistenceChecks": {
+    "observedAt": "2026-11-01T12:37:28.372393+00:00",
+    "method": "docker compose down followed by up --wait using the same registry and engine volumes",
+    "inventoryAndCaseMappingsRetained": true,
+    "duplicateCreationRejected": true,
+    "duplicateOrPostCancellationDispatchRejected": true,
+    "transportRegistrationsRemainUnique": true
+  },
+  "cleanCopyReview": {
+    "candidateFiles": 27,
+    "python": "3.12",
+    "offlineTestsPassed": 28,
+    "bpmnLint": "Both BPMN models passed @camunda8/cli 4.6.1 with no issues",
+    "composeValidation": "passed",
+    "freshDependencies": "installed from deployer/requirements.txt",
+    "dockerEngine": "29.8.0",
+    "dockerCompose": "5.5.1"
+  },
+  "portalCompatibility": {
+    "change": "Added portal custom/eventData, visualization coordinates and empty subProcesses resource section",
+    "previousModelSha256": "57b4e1e0b1f3ca9b6d279ce425b16d1c04ce86238aeb6a7c58e341974901a817",
+    "logicalGraphUnchanged": true,
+    "logicalGraphSha256": "807c23faefcc22916ed7b78c3062f5f5b741cbffadf596b6c12f25967f91de6c",
+    "originalEngineLogUnchanged": true,
+    "regressionTestsPassed": 29,
+    "regressionTestFile": "stage_tests/test_stage1.py",
+    "regressionTestFileSha256": "3cef7e71a6aecde29d0471d7602c45419a8655d3e4e953d19b3e78e6154f9138",
+    "localReplay": {
+      "p1-b9814f2e-1": {
+        "valid": true,
+        "accepting": true,
+        "pending": []
+      },
+      "p1-b9814f2e-2": {
+        "valid": true,
+        "accepting": true,
+        "pending": []
+      },
+      "p1-b9814f2e-3": {
+        "valid": true,
+        "accepting": true,
+        "pending": []
+      }
+    }
+  },
+  "responsibleStudent": "Ashvanth",
+  "attributionUpdate": {
+    "recordedAt": "2026-11-01T13:11:15.269462+00:00",
+    "responsibleStudent": "Ashvanth",
+    "process": "P1",
+    "changes": "Ownership retained in project records and DCR display title; removed BPMN source/PDF student attribution at user request",
+    "bpmnSha256AtEngineCheck": "ff7cca3684bb5c41e425dd3666abdc05c146fb0ac12f540c80019b16d4fe3efa",
+    "dcrSha256AtPortalCheck": "e9a8dc1f8be9c829a09d5b7f14925ed74e008f7b4626c3134efc3f5b37e38a42",
+    "workflowAndDcrSemanticsUnchanged": true,
+    "pdfFile": "bpmn/shipment_preparation.pdf",
+    "pdfSha256": "bd6481a160ceb6968a604721e6477b97607248a0f908075e59bbd8977be8063b",
+    "bpmnLint": "passed with no issues",
+    "pdfAttribution": "Student name omitted at user request; PDF title is P1 Shipment preparation"
+  }
+}

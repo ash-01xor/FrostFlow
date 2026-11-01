@@ -1,0 +1,11 @@
+{
+  "shipmentId": "S-001",
+  "journeyId": "J-001",
+  "vehicleId": "V-01",
+  "recipientId": "C-01",
+  "routeId": "route-01",
+  "productId": "PRD-001",
+  "batchId": "DEMO-MILK-001",
+  "quantity": 15,
+  "deliveryDeadline": "2026-12-01T12:00:00Z"
+}

@@ -1,0 +1,5 @@
+{
+  "kind": "deliberately-invalid-test-trace",
+  "description": "Dispatch attempted after cancellation of a stock-waiting shipment.",
+  "events": ["ShipmentCreated", "StockChecked", "StockUnavailable", "ShipmentCancelled", "ShipmentDispatched"]
+}

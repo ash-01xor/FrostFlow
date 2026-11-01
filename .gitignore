@@ -1,0 +1,16 @@
+
+.DS_Store
+__pycache__/
+*.py[cod]
+.venv/
+.ruff_cache/
+.env
+.env.*
+!.env.example
+node_modules/
+runtime/
+runtime-backup-*/
+logging_service/logs/
+logging_service/XES/
+# Supplied PDFs stay local; Markdown guides and project_notes are shared.
+docs/*.pdf
