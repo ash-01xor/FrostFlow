@@ -134,15 +134,21 @@ class Registry:
             journeyId=record["journeyId"],
             occurredAt=stamp,
             recordedAt=stamp,
-            source="preparation" if process == "P1" else "transport",
+            source={
+                "P1": "preparation",
+                "P2": "transport",
+                "P3": "receiving",
+            }.get(process, process.lower()),
             inputMode="system" if actor == "system" else "manual",
             actor=actor,
             role="integration" if actor == "system" else "operator",
             outcome="success",
             process=process,
-            processInstanceKey=record.get("processInstanceKey")
-            if process == "P1"
-            else record.get("p2ProcessInstanceKey"),
+            processInstanceKey={
+                "P1": record.get("processInstanceKey"),
+                "P2": record.get("p2ProcessInstanceKey"),
+                "P3": record.get("p3ProcessInstanceKey"),
+            }.get(process),
             payload={
                 **identity,
                 **(
@@ -248,6 +254,110 @@ class Registry:
             record.update({k: v for k, v in details.items() if k != "initialCrates"})
             self.save(db, record)
             self.event(db, record, "ShipmentCreated")
+
+    def record_receipt(self, shipment_id, receiver):
+        with self.transaction() as db:
+            record = self.read(db, shipment_id)
+
+            if record.get("receiptStatus") == "RECEIVED":
+                return record
+
+            if not receiver or not receiver.strip():
+                raise ValueError("receiver is required")
+
+            record.update(
+                receiptStatus="RECEIVED",
+                receiver=receiver.strip(),
+                receivedAt=now(),
+            )
+
+            self.event(
+                db,
+                record,
+                "GoodsReceived",
+                actor=receiver.strip(),
+                process="P3",
+            )
+
+            self.save(db, record)
+            return record 
+
+    def record_inspection(self, shipment_id, inspector, passed):
+        with self.transaction() as db:
+            record = self.read(db, shipment_id)
+
+            if record.get("receiptStatus") != "RECEIVED":
+                raise Conflict("goods must be received before inspection")
+
+            if not inspector or not inspector.strip():
+                raise ValueError("inspector is required")
+
+            record.update(
+                inspectionStatus="PASSED" if passed else "FAILED",
+                inspector=inspector.strip(),
+                inspectedAt=now(),
+            )
+
+            self.event(
+                db,
+                record,
+                "GoodsInspected",
+                actor=inspector.strip(),
+                process="P3",
+                payload={"passed": bool(passed)},
+            )
+
+            self.save(db, record)
+            return record  
+
+    def admit_stock(self, shipment_id, receiver):
+        with self.transaction() as db:
+            record = self.read(db, shipment_id)
+
+            if record.get("receiptStatus") != "RECEIVED":
+                raise Conflict("goods must be received before admission")
+
+            if record.get("inspectionStatus") != "PASSED":
+                raise Conflict("goods must pass inspection before admission")
+
+            if record.get("admissionStatus") == "ADMITTED":
+                return record
+
+            if record.get("qualityStatus") not in ("CLEAR", "RELEASED"):
+                raise Conflict("goods are blocked by quality status")
+
+            if not receiver or not receiver.strip():
+                raise ValueError("receiver is required")
+
+            cursor = db.execute(
+                "UPDATE inventory SET available=available+? "
+                "WHERE product_id=? AND batch_id=?",
+                (
+                    record["quantity"],
+                    record["productId"],
+                    record["batchId"],
+                ),
+            )
+
+            if cursor.rowcount != 1:
+                raise Conflict("inventory record for product and batch not found")
+
+            record.update(
+                admissionStatus="ADMITTED",
+                admittedBy=receiver.strip(),
+                admittedAt=now(),
+            )
+
+            self.event(
+                db,
+                record,
+                "StockAdmitted",
+                actor=receiver.strip(),
+                process="P3",
+            )
+
+            self.save(db, record)
+            return record    
 
     def attach_key(self, shipment_id, key):
         with self.transaction() as db:

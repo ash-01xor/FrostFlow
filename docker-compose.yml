@@ -8,6 +8,7 @@ services:
       ZEEBE_ADDRESS: zeebe:26500
       BPMN_FILE: /bpmn/shipment_preparation.bpmn
       P2_BPMN_FILE: /bpmn/transport.bpmn
+      P3_BPMN_FILE: /bpmn/receiving.bpmn
       REGISTRY_PATH: /data/registry.sqlite
     volumes:
       - ./bpmn:/bpmn:ro

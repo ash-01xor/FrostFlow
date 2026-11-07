@@ -112,6 +112,294 @@ class Preparation(unittest.TestCase):
             ),
         )
 
+#Testing for process 3 (Record recieved)
+
+    def test_receipt_does_not_automatically_admit_stock(self):
+        self.create(quantity=3)
+
+        initial_stock = self.available()
+
+        record = self.db.record_receipt("S-test", "warehouse-operator")
+
+        self.assertEqual(record["receiptStatus"], "RECEIVED")
+        self.assertEqual(record["receiver"], "warehouse-operator")
+        self.assertIn("receivedAt", record)
+
+        # Receiving goods must not change available inventory.
+        self.assertEqual(self.available(), initial_stock)
+
+        events = self.db.events("S-test")
+        receipt_events = [
+            event for event in events
+            if event["eventType"] == "GoodsReceived"
+        ]
+
+        self.assertEqual(len(receipt_events), 1)
+        self.assertEqual(receipt_events[0]["process"], "P3")
+        self.assertEqual(receipt_events[0]["source"], "receiving")
+ # Duplicate events are not created if duplicate recipets are recieved
+
+ 
+    def test_duplicate_receipt_does_not_create_duplicate_event(self):
+        self.create(quantity=3)
+
+        first = self.db.record_receipt("S-test", "warehouse-operator")
+        second = self.db.record_receipt("S-test", "warehouse-operator")
+
+        self.assertEqual(first["receivedAt"], second["receivedAt"])
+
+        events = self.db.events("S-test")
+        receipt_events = [
+            event for event in events
+            if event["eventType"] == "GoodsReceived"
+        ]
+
+        self.assertEqual(len(receipt_events), 1)
+
+#goods cannot be inspected before they have been received    
+    def test_inspection_requires_receipt(self):
+        self.create(quantity=3)
+
+        with self.assertRaises(Conflict):
+            self.db.record_inspection(
+                "S-test",
+                "quality-inspector",
+                True,
+            )
+#successful inspection is recorded correctly, but does not automatically add goods to inventory.
+
+    def test_successful_inspection_is_recorded(self):
+        self.create(quantity=3)
+        self.db.record_receipt("S-test", "warehouse-operator")
+
+        initial_stock = self.available()
+
+        record = self.db.record_inspection(
+            "S-test",
+            "quality-inspector",
+            True,
+        )
+
+        self.assertEqual(record["inspectionStatus"], "PASSED")
+        self.assertEqual(record["inspector"], "quality-inspector")
+        self.assertIn("inspectedAt", record)
+        self.assertEqual(self.available(), initial_stock)
+
+        events = self.db.events("S-test")
+        inspection_events = [
+            event for event in events
+            if event["eventType"] == "GoodsInspected"
+        ]
+
+        self.assertEqual(len(inspection_events), 1)
+        self.assertEqual(inspection_events[0]["process"], "P3")
+        self.assertEqual(inspection_events[0]["payload"]["passed"], True)
+
+#Goods that fail inspection must not be admitted into stock.
+
+    def test_failed_inspection_is_recorded(self):
+        self.create(quantity=3)
+        self.db.record_receipt("S-test", "warehouse-operator")
+
+        record = self.db.record_inspection(
+            "S-test",
+            "quality-inspector",
+            False,
+        )
+
+        self.assertEqual(record["inspectionStatus"], "FAILED")
+        self.assertEqual(record["inspector"], "quality-inspector")
+
+        events = self.db.events("S-test")
+        inspection_events = [
+            event for event in events
+            if event["eventType"] == "GoodsInspected"
+        ]
+
+        self.assertEqual(len(inspection_events), 1)
+        self.assertFalse(inspection_events[0]["payload"]["passed"])
+#normal successful admission path
+
+    def test_admission_increases_inventory(self):
+        self.create(quantity=3)
+        self.db.record_receipt("S-test", "warehouse-operator")
+        self.db.record_inspection("S-test", "quality-inspector", True)
+
+        initial_stock = self.available()
+
+        record = self.db.admit_stock("S-test", "warehouse-operator")
+
+        self.assertEqual(record["admissionStatus"], "ADMITTED")
+        self.assertEqual(record["admittedBy"], "warehouse-operator")
+        self.assertIn("admittedAt", record)
+
+        self.assertEqual(self.available(), initial_stock + 3)
+
+        events = self.db.events("S-test")
+        admission_events = [
+            event for event in events
+            if event["eventType"] == "StockAdmitted"
+        ]
+
+        self.assertEqual(len(admission_events), 1)
+        self.assertEqual(admission_events[0]["process"], "P3")
+
+#Even if goods have been received and passed inspection, they must not be admitted while a quality investigation is pending.
+    def test_admission_blocked_during_quality_hold(self):
+        self.create(quantity=3)
+        self.db.record_receipt("S-test", "warehouse-operator")
+        self.db.record_inspection("S-test", "quality-inspector", True)
+
+        # Simulate an active quality investigation from P4.
+        with self.db.transaction() as db:
+            record = self.db.read(db, "S-test")
+            record["qualityStatus"] = "PENDING"
+            self.db.save(db, record)
+
+        initial_stock = self.available()
+
+        with self.assertRaises(Conflict):
+            self.db.admit_stock("S-test", "warehouse-operator")
+
+        self.assertEqual(self.available(), initial_stock)
+#prevent the same shipment from being added to inventory twice
+
+    def test_duplicate_admission_does_not_increase_inventory_twice(self):
+        self.create(quantity=3)
+        self.db.record_receipt("S-test", "warehouse-operator")
+        self.db.record_inspection("S-test", "quality-inspector", True)
+
+        self.db.admit_stock("S-test", "warehouse-operator")
+        stock_after_first_admission = self.available()
+
+        # Attempt to admit the same shipment again.
+        self.db.admit_stock("S-test", "warehouse-operator")
+
+        self.assertEqual(self.available(), stock_after_first_admission)
+
+        events = self.db.events("S-test")
+        admission_events = [
+            event for event in events
+            if event["eventType"] == "StockAdmitted"
+        ]
+
+        self.assertEqual(len(admission_events), 1)
+
+#fail inspection cannot enter inventory
+    def test_admission_blocked_after_failed_inspection(self):
+        self.create(quantity=3)
+        self.db.record_receipt("S-test", "warehouse-operator")
+        self.db.record_inspection("S-test", "quality-inspector", False)
+
+        initial_stock = self.available()
+
+        with self.assertRaises(Conflict):
+            self.db.admit_stock("S-test", "warehouse-operator")
+
+        self.assertEqual(self.available(), initial_stock)
+
+    def test_admission_fails_if_inventory_record_is_missing(self):
+        self.create(quantity=3)
+        self.db.record_receipt("S-test", "warehouse-operator")
+        self.db.record_inspection("S-test", "quality-inspector", True)
+
+        # Remove the product/batch inventory record.
+        with self.db.transaction() as db:
+            db.execute(
+                "DELETE FROM inventory WHERE product_id=? AND batch_id=?",
+                ("PRD-001", "DEMO-MILK-001"),
+            )
+
+        with self.assertRaises(Conflict):
+            self.db.admit_stock("S-test", "warehouse-operator")
+
+        record = self.db.get("S-test")
+        self.assertNotEqual(record.get("admissionStatus"), "ADMITTED")
+#Test endpoint
+
+    def test_receive_endpoint(self):
+        self.create(quantity=3)
+
+        response = self.http.post(
+            "/shipments/S-test/receive",
+            json={"receiver": "warehouse-operator"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.get_json()["receiptStatus"], "RECEIVED")
+        self.assertEqual(
+            response.get_json()["receiver"],
+            "warehouse-operator",
+        )
+    def test_inspect_endpoint(self):
+        self.create(quantity=3)
+
+        self.http.post(
+            "/shipments/S-test/receive",
+            json={"receiver": "warehouse-operator"},
+        )
+
+        response = self.http.post(
+            "/shipments/S-test/inspect",
+            json={
+                "inspector": "quality-inspector",
+                "passed": True,
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.get_json()["inspectionStatus"], "PASSED")
+        self.assertEqual(
+            response.get_json()["inspector"],
+            "quality-inspector",
+        )
+
+    def test_admit_endpoint(self):
+        self.create(quantity=3)
+
+        self.http.post(
+            "/shipments/S-test/receive",
+            json={"receiver": "warehouse-operator"},
+        )
+
+        self.http.post(
+            "/shipments/S-test/inspect",
+            json={
+                "inspector": "quality-inspector",
+                "passed": True,
+            },
+        )
+
+        initial_stock = self.available()
+
+        response = self.http.post(
+            "/shipments/S-test/admit",
+            json={"receiver": "warehouse-operator"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.get_json()["admissionStatus"], "ADMITTED")
+        self.assertEqual(self.available(), initial_stock + 3)
+
+    def test_inspect_endpoint_rejects_non_boolean_passed(self):
+        self.create(quantity=3)
+
+        self.http.post(
+            "/shipments/S-test/receive",
+            json={"receiver": "warehouse-operator"},
+        )
+
+        response = self.http.post(
+            "/shipments/S-test/inspect",
+            json={
+                "inspector": "quality-inspector",
+                "passed": "true",
+            },
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("passed must be a JSON boolean", response.get_json()["error"])
+
     def test_dispatch_requires_processed_loading(self):
         self.loading_wait()
 
@@ -611,6 +899,7 @@ class Preparation(unittest.TestCase):
                 "CREATE TABLE inventory (id INTEGER PRIMARY KEY, available INTEGER NOT NULL)"
             )
             db.execute("INSERT INTO inventory VALUES (1,17)")
+        db.close()
         before = path.read_bytes()
         with self.assertRaisesRegex(ValueError, "legacy pooled stock"):
             Registry(path)

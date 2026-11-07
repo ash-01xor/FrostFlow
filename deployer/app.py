@@ -22,6 +22,9 @@ JOB_TYPES = [
     "p1-dispatch",
     "p1-cancel",
     "p2-start-transport",
+    "p3-record-receipt",
+    "p3-inspect-goods",
+    "p3-admit-stock",
 ]
 app = Flask(__name__)
 registry = Registry(os.getenv("REGISTRY_PATH", "runtime/registry.sqlite"))
@@ -84,6 +87,41 @@ def shipment(shipment_id):
 @app.get("/shipments/<shipment_id>/events")
 def events(shipment_id):
     return jsonify(registry.events(shipment_id))
+
+@app.post("/shipments/<shipment_id>/receive")
+def receive(shipment_id):
+    data = body()
+    receiver = text_field(data, "receiver")
+
+    record = registry.record_receipt(shipment_id, receiver)
+
+    return jsonify(record), 200
+
+@app.post("/shipments/<shipment_id>/inspect")
+def inspect(shipment_id):
+    data = body()
+    inspector = text_field(data, "inspector")
+
+    passed = data.get("passed")
+    if not isinstance(passed, bool):
+        raise ValueError("passed must be a JSON boolean")
+
+    record = registry.record_inspection(
+        shipment_id,
+        inspector,
+        passed,
+    )
+
+    return jsonify(record), 200
+
+@app.post("/shipments/<shipment_id>/admit")
+def admit(shipment_id):
+    data = body()
+    receiver = text_field(data, "receiver")
+
+    record = registry.admit_stock(shipment_id, receiver)
+
+    return jsonify(record), 200
 
 
 @app.get("/stock")
@@ -277,6 +315,28 @@ async def cancel_shipment(shipmentId, job: Job):
 async def start_transport(shipmentId, dispatchEvent, job: Job):
     return registry.start_transport(shipmentId, job.process_instance_key, dispatchEvent)
 
+#Process 3
+
+async def record_receipt(shipmentId, receiver, job: Job):
+    registry.record_receipt(shipmentId, receiver)
+    return {}
+
+
+async def inspect_goods(shipmentId, inspector, passed, job: Job):
+    record = registry.record_inspection(shipmentId, inspector, passed)
+
+    admission_allowed = (
+        record.get("inspectionStatus") == "PASSED"
+        and record.get("qualityStatus") in ("CLEAR", "RELEASED")
+    )
+
+    return {"admissionAllowed": admission_allowed}
+
+
+async def admit_stock(shipmentId, receiver, job: Job):
+    registry.admit_stock(shipmentId, receiver)
+    return {"admitted": True}
+
 
 async def deliver_messages():
     """Retry unsent durable commands; successful dispatch is acknowledged by P2's worker."""
@@ -321,13 +381,17 @@ async def main():
             dispatch_shipment,
             cancel_shipment,
             start_transport,
+            record_receipt,
+            inspect_goods,
+            admit_stock,
         ),
     ):
-        variables = (
-            ["shipmentId", "dispatchEvent"]
-            if job_type == "p2-start-transport"
-            else ["shipmentId"]
-        )
+        variables = {
+            "p2-start-transport": ["shipmentId", "dispatchEvent"],
+            "p3-record-receipt": ["shipmentId", "receiver"],
+            "p3-inspect-goods": ["shipmentId", "inspector", "passed"],
+            "p3-admit-stock": ["shipmentId", "receiver"],
+        }.get(job_type, ["shipmentId"])
         worker.task(task_type=job_type, variables_to_fetch=variables)(handler)
     threading.Thread(
         target=lambda: app.run(host="0.0.0.0", port=5001, threaded=True), daemon=True
@@ -335,10 +399,12 @@ async def main():
     try:
         for attempt in range(60):
             try:
-                await client.deploy_resource(
+                deployment = await client.deploy_resource(
                     os.getenv("BPMN_FILE", "bpmn/shipment_preparation.bpmn"),
                     os.getenv("P2_BPMN_FILE", "bpmn/transport.bpmn"),
+                    os.getenv("P3_BPMN_FILE", "bpmn/receiving.bpmn"),
                 )
+                app.logger.warning("BPMN deployment response: %r", deployment)
                 break
             except Exception as error:
                 if attempt in (0, 59):
