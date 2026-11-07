@@ -1,0 +1,285 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" xmlns:di="http://www.omg.org/spec/DD/20100524/DI" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:zeebe="http://camunda.org/schema/zeebe/1.0" xmlns:modeler="http://camunda.org/schema/modeler/1.0" id="ColdChainDefinitions" targetNamespace="http://cold-chain.example/bpmn" modeler:executionPlatform="Camunda Cloud" modeler:executionPlatformVersion="8.8.0">
+  <bpmn:process id="ShipmentPreparation" name="P1 Shipment preparation" isExecutable="true">
+    <bpmn:startEvent id="OrderAccepted" name="Order accepted">
+      <bpmn:outgoing>Flow_1</bpmn:outgoing>
+    </bpmn:startEvent>
+    <bpmn:exclusiveGateway id="StockCheckJoin" name="Check or recheck">
+      <bpmn:incoming>Flow_1</bpmn:incoming>
+      <bpmn:incoming>Flow_Recheck</bpmn:incoming>
+      <bpmn:outgoing>Flow_2</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:serviceTask id="CheckStock" name="Check and reserve stock">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="p1-check-stock" retries="3" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_2</bpmn:incoming>
+      <bpmn:outgoing>Flow_3</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:exclusiveGateway id="StockAvailable" name="Stock available?" default="Flow_Unavailable">
+      <bpmn:incoming>Flow_3</bpmn:incoming>
+      <bpmn:outgoing>Flow_4</bpmn:outgoing>
+      <bpmn:outgoing>Flow_Unavailable</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:serviceTask id="AllocateStock" name="Allocate stock">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="p1-allocate-stock" retries="3" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_4</bpmn:incoming>
+      <bpmn:outgoing>Flow_5</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:serviceTask id="AssignTransport" name="Assign vehicle and route">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="p1-assign-transport" retries="3" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_5</bpmn:incoming>
+      <bpmn:outgoing>Flow_6</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:intermediateCatchEvent id="WaitForLoading" name="Await loading verification">
+      <bpmn:incoming>Flow_6</bpmn:incoming>
+      <bpmn:outgoing>Flow_7</bpmn:outgoing>
+      <bpmn:messageEventDefinition id="WaitForLoadingDefinition" messageRef="Message_LoadingVerified" />
+    </bpmn:intermediateCatchEvent>
+    <bpmn:serviceTask id="RecordLoading" name="Record loading verification">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="p1-record-loading" retries="3" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_7</bpmn:incoming>
+      <bpmn:outgoing>Flow_8</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:intermediateCatchEvent id="WaitForDispatch" name="Await dispatch approval">
+      <bpmn:incoming>Flow_8</bpmn:incoming>
+      <bpmn:outgoing>Flow_9</bpmn:outgoing>
+      <bpmn:messageEventDefinition id="WaitForDispatchDefinition" messageRef="Message_DispatchApproved" />
+    </bpmn:intermediateCatchEvent>
+    <bpmn:serviceTask id="DispatchShipment" name="Dispatch shipment">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="p1-dispatch" retries="3" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_9</bpmn:incoming>
+      <bpmn:outgoing>Flow_10</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:endEvent id="PreparationCompleted" name="Preparation completed">
+      <bpmn:incoming>Flow_10</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:eventBasedGateway id="WaitForStockDecision" name="Await stock or cancellation">
+      <bpmn:incoming>Flow_Unavailable</bpmn:incoming>
+      <bpmn:outgoing>Flow_Replenish</bpmn:outgoing>
+      <bpmn:outgoing>Flow_CancelWait</bpmn:outgoing>
+    </bpmn:eventBasedGateway>
+    <bpmn:intermediateCatchEvent id="WaitForReplenishment" name="Stock replenished">
+      <bpmn:incoming>Flow_Replenish</bpmn:incoming>
+      <bpmn:outgoing>Flow_Recheck</bpmn:outgoing>
+      <bpmn:messageEventDefinition id="WaitForReplenishmentDefinition" messageRef="Message_StockReplenished" />
+    </bpmn:intermediateCatchEvent>
+    <bpmn:intermediateCatchEvent id="WaitForCancellation" name="Cancellation requested">
+      <bpmn:incoming>Flow_CancelWait</bpmn:incoming>
+      <bpmn:outgoing>Flow_Cancel</bpmn:outgoing>
+      <bpmn:messageEventDefinition id="WaitForCancellationDefinition" messageRef="Message_ShipmentCancellationRequested" />
+    </bpmn:intermediateCatchEvent>
+    <bpmn:serviceTask id="CancelShipment" name="Cancel shipment">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="p1-cancel" retries="3" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_Cancel</bpmn:incoming>
+      <bpmn:outgoing>Flow_Cancelled</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:endEvent id="ShipmentCancelled" name="Shipment cancelled">
+      <bpmn:incoming>Flow_Cancelled</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:sequenceFlow id="Flow_1" sourceRef="OrderAccepted" targetRef="StockCheckJoin" />
+    <bpmn:sequenceFlow id="Flow_2" sourceRef="StockCheckJoin" targetRef="CheckStock" />
+    <bpmn:sequenceFlow id="Flow_3" sourceRef="CheckStock" targetRef="StockAvailable" />
+    <bpmn:sequenceFlow id="Flow_4" name="Available" sourceRef="StockAvailable" targetRef="AllocateStock">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">=stockAvailable</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_5" sourceRef="AllocateStock" targetRef="AssignTransport" />
+    <bpmn:sequenceFlow id="Flow_6" sourceRef="AssignTransport" targetRef="WaitForLoading" />
+    <bpmn:sequenceFlow id="Flow_7" sourceRef="WaitForLoading" targetRef="RecordLoading" />
+    <bpmn:sequenceFlow id="Flow_8" sourceRef="RecordLoading" targetRef="WaitForDispatch" />
+    <bpmn:sequenceFlow id="Flow_9" sourceRef="WaitForDispatch" targetRef="DispatchShipment" />
+    <bpmn:sequenceFlow id="Flow_10" sourceRef="DispatchShipment" targetRef="PreparationCompleted" />
+    <bpmn:sequenceFlow id="Flow_Unavailable" name="Unavailable" sourceRef="StockAvailable" targetRef="WaitForStockDecision" />
+    <bpmn:sequenceFlow id="Flow_Replenish" sourceRef="WaitForStockDecision" targetRef="WaitForReplenishment" />
+    <bpmn:sequenceFlow id="Flow_Recheck" sourceRef="WaitForReplenishment" targetRef="StockCheckJoin" />
+    <bpmn:sequenceFlow id="Flow_CancelWait" sourceRef="WaitForStockDecision" targetRef="WaitForCancellation" />
+    <bpmn:sequenceFlow id="Flow_Cancel" sourceRef="WaitForCancellation" targetRef="CancelShipment" />
+    <bpmn:sequenceFlow id="Flow_Cancelled" sourceRef="CancelShipment" targetRef="ShipmentCancelled" />
+  </bpmn:process>
+  <bpmn:message id="Message_LoadingVerified" name="LoadingVerified">
+    <bpmn:extensionElements>
+      <zeebe:subscription correlationKey="=shipmentId" />
+    </bpmn:extensionElements>
+  </bpmn:message>
+  <bpmn:message id="Message_DispatchApproved" name="DispatchApproved">
+    <bpmn:extensionElements>
+      <zeebe:subscription correlationKey="=shipmentId" />
+    </bpmn:extensionElements>
+  </bpmn:message>
+  <bpmn:message id="Message_StockReplenished" name="StockReplenished">
+    <bpmn:extensionElements>
+      <zeebe:subscription correlationKey="=stockWaitKey" />
+    </bpmn:extensionElements>
+  </bpmn:message>
+  <bpmn:message id="Message_ShipmentCancellationRequested" name="ShipmentCancellationRequested">
+    <bpmn:extensionElements>
+      <zeebe:subscription correlationKey="=stockWaitKey" />
+    </bpmn:extensionElements>
+  </bpmn:message>
+  <bpmndi:BPMNDiagram id="Diagram">
+    <bpmndi:BPMNPlane id="Plane" bpmnElement="ShipmentPreparation">
+      <bpmndi:BPMNShape id="OrderAccepted_di" bpmnElement="OrderAccepted">
+        <dc:Bounds x="160" y="102" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="133" y="143" width="100" height="40" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="StockCheckJoin_di" bpmnElement="StockCheckJoin">
+        <dc:Bounds x="340" y="95" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="313" y="150" width="100" height="40" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="CheckStock_di" bpmnElement="CheckStock">
+        <dc:Bounds x="520" y="80" width="100" height="80" />
+        <bpmndi:BPMNLabel />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="StockAvailable_di" bpmnElement="StockAvailable">
+        <dc:Bounds x="700" y="95" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="673" y="150" width="100" height="40" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="AllocateStock_di" bpmnElement="AllocateStock">
+        <dc:Bounds x="880" y="80" width="100" height="80" />
+        <bpmndi:BPMNLabel />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="AssignTransport_di" bpmnElement="AssignTransport">
+        <dc:Bounds x="1060" y="80" width="100" height="80" />
+        <bpmndi:BPMNLabel />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="WaitForLoading_di" bpmnElement="WaitForLoading">
+        <dc:Bounds x="1240" y="102" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1213" y="143" width="100" height="40" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="RecordLoading_di" bpmnElement="RecordLoading">
+        <dc:Bounds x="1420" y="80" width="100" height="80" />
+        <bpmndi:BPMNLabel />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="WaitForDispatch_di" bpmnElement="WaitForDispatch">
+        <dc:Bounds x="1600" y="102" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1573" y="143" width="100" height="40" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DispatchShipment_di" bpmnElement="DispatchShipment">
+        <dc:Bounds x="1780" y="80" width="100" height="80" />
+        <bpmndi:BPMNLabel />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="PreparationCompleted_di" bpmnElement="PreparationCompleted">
+        <dc:Bounds x="1960" y="102" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1933" y="143" width="100" height="40" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="WaitForStockDecision_di" bpmnElement="WaitForStockDecision">
+        <dc:Bounds x="700" y="355" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="673" y="410" width="100" height="40" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="WaitForReplenishment_di" bpmnElement="WaitForReplenishment">
+        <dc:Bounds x="880" y="362" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="853" y="403" width="100" height="40" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="WaitForCancellation_di" bpmnElement="WaitForCancellation">
+        <dc:Bounds x="880" y="542" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="853" y="583" width="100" height="40" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="CancelShipment_di" bpmnElement="CancelShipment">
+        <dc:Bounds x="1060" y="520" width="100" height="80" />
+        <bpmndi:BPMNLabel />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="ShipmentCancelled_di" bpmnElement="ShipmentCancelled">
+        <dc:Bounds x="1240" y="542" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1213" y="583" width="100" height="40" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="Flow_1_di" bpmnElement="Flow_1">
+        <di:waypoint x="196" y="120" />
+        <di:waypoint x="340" y="120" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_2_di" bpmnElement="Flow_2">
+        <di:waypoint x="390" y="120" />
+        <di:waypoint x="520" y="120" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_3_di" bpmnElement="Flow_3">
+        <di:waypoint x="620" y="120" />
+        <di:waypoint x="700" y="120" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_4_di" bpmnElement="Flow_4">
+        <di:waypoint x="750" y="120" />
+        <di:waypoint x="880" y="120" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_5_di" bpmnElement="Flow_5">
+        <di:waypoint x="980" y="120" />
+        <di:waypoint x="1060" y="120" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_6_di" bpmnElement="Flow_6">
+        <di:waypoint x="1160" y="120" />
+        <di:waypoint x="1240" y="120" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_7_di" bpmnElement="Flow_7">
+        <di:waypoint x="1276" y="120" />
+        <di:waypoint x="1420" y="120" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_8_di" bpmnElement="Flow_8">
+        <di:waypoint x="1520" y="120" />
+        <di:waypoint x="1600" y="120" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_9_di" bpmnElement="Flow_9">
+        <di:waypoint x="1636" y="120" />
+        <di:waypoint x="1780" y="120" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_10_di" bpmnElement="Flow_10">
+        <di:waypoint x="1880" y="120" />
+        <di:waypoint x="1960" y="120" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_Unavailable_di" bpmnElement="Flow_Unavailable">
+        <di:waypoint x="725" y="145" />
+        <di:waypoint x="725" y="355" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_Replenish_di" bpmnElement="Flow_Replenish">
+        <di:waypoint x="750" y="380" />
+        <di:waypoint x="880" y="380" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_Recheck_di" bpmnElement="Flow_Recheck">
+        <di:waypoint x="916" y="380" />
+        <di:waypoint x="1000" y="380" />
+        <di:waypoint x="1000" y="240" />
+        <di:waypoint x="365" y="240" />
+        <di:waypoint x="365" y="145" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_CancelWait_di" bpmnElement="Flow_CancelWait">
+        <di:waypoint x="725" y="405" />
+        <di:waypoint x="725" y="560" />
+        <di:waypoint x="880" y="560" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_Cancel_di" bpmnElement="Flow_Cancel">
+        <di:waypoint x="916" y="560" />
+        <di:waypoint x="1060" y="560" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_Cancelled_di" bpmnElement="Flow_Cancelled">
+        <di:waypoint x="1160" y="560" />
+        <di:waypoint x="1240" y="560" />
+      </bpmndi:BPMNEdge>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+</bpmn:definitions>

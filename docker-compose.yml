@@ -1,0 +1,81 @@
+name: cold-chain
+services:
+  communication:
+    build: ./deployer
+    ports:
+      - "127.0.0.1:5001:5001"
+    environment:
+      ZEEBE_ADDRESS: zeebe:26500
+      BPMN_FILE: /bpmn/shipment_preparation.bpmn
+      P2_BPMN_FILE: /bpmn/transport.bpmn
+      REGISTRY_PATH: /data/registry.sqlite
+    volumes:
+      - ./bpmn:/bpmn:ro
+      - ${REGISTRY_DIR:-./runtime}:/data
+    depends_on:
+      - zeebe
+    healthcheck:
+      test: ["CMD", "python", "-c", "from urllib.request import urlopen; urlopen('http://localhost:5001/health', timeout=2)"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+      start_period: 20s
+
+  zeebe:
+    image: camunda/zeebe:8.8.0
+    ports:
+      - "127.0.0.1:26501:26500"
+      - "127.0.0.1:9601:9600"
+    environment:
+      CAMUNDA_SECURITY_AUTHENTICATION_UNPROTECTEDAPI: "true"
+      CAMUNDA_SECURITY_AUTHORIZATIONS_ENABLED: "false"
+      CAMUNDA_DATA_SECONDARYSTORAGE_ELASTICSEARCH_URL: http://elasticsearch:9200
+      ZEEBE_BROKER_EXPORTERS_ELASTICSEARCH_CLASSNAME: io.camunda.zeebe.exporter.ElasticsearchExporter
+      ZEEBE_BROKER_EXPORTERS_ELASTICSEARCH_ARGS_URL: http://elasticsearch:9200
+    volumes:
+      - zeebe-data:/usr/local/zeebe/data
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.16.0
+    environment:
+      discovery.type: single-node
+      xpack.security.enabled: "false"
+      ES_JAVA_OPTS: -Xms512m -Xmx512m
+    ports:
+      - "127.0.0.1:9200:9200"
+    volumes:
+      - elasticsearch-data:/usr/share/elasticsearch/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:9200/_cluster/health > /dev/null || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 20s
+
+  operate:
+    image: camunda/operate:8.8.0
+    ports:
+      - "127.0.0.1:8081:8080"
+    depends_on:
+      zeebe:
+        condition: service_started
+      elasticsearch:
+        condition: service_healthy
+    environment:
+      CAMUNDA_OPERATE_ZEEBE_GATEWAYADDRESS: zeebe:26500
+      CAMUNDA_OPERATE_ELASTICSEARCH_URL: http://elasticsearch:9200
+      CAMUNDA_DATA_SECONDARYSTORAGE_ELASTICSEARCH_URL: http://elasticsearch:9200
+      CAMUNDA_SECURITY_AUTHENTICATION_METHOD: basic
+      CAMUNDA_SECURITY_AUTHENTICATION_UNPROTECTEDAPI: "true"
+      CAMUNDA_SECURITY_AUTHORIZATIONS_ENABLED: "false"
+      CAMUNDA_SECURITY_INITIALIZATION_USERS_0_USERNAME: demo
+      CAMUNDA_SECURITY_INITIALIZATION_USERS_0_PASSWORD: demo
+      CAMUNDA_SECURITY_INITIALIZATION_USERS_0_NAME: Demo User
+      CAMUNDA_SECURITY_INITIALIZATION_DEFAULTROLES_ADMIN_USERS_0: demo
+
+volumes:
+  zeebe-data:
+  elasticsearch-data:

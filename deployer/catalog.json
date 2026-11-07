@@ -1,0 +1,47 @@
+{
+  "datasetVersion": 3,
+  "quantityUnit": "crate",
+  "temperatureProfileId": "CHILLED-DEMO",
+  "products": [
+    {
+      "productId": "PRD-001",
+      "productName": "Fresh milk",
+      "packDescription": "1 litre carton",
+      "packsPerCrate": 12,
+      "batchId": "DEMO-MILK-001",
+      "initialCrates": 20
+    },
+    {
+      "productId": "PRD-002",
+      "productName": "Plain yoghurt",
+      "packDescription": "500 gram tub",
+      "packsPerCrate": 12,
+      "batchId": "DEMO-YOGHURT-001",
+      "initialCrates": 20
+    },
+    {
+      "productId": "PRD-003",
+      "productName": "Fresh cheese",
+      "packDescription": "250 gram sealed pack",
+      "packsPerCrate": 12,
+      "batchId": "DEMO-CHEESE-001",
+      "initialCrates": 20
+    },
+    {
+      "productId": "PRD-004",
+      "productName": "Raw chicken breast",
+      "packDescription": "500 gram sealed pack",
+      "packsPerCrate": 12,
+      "batchId": "DEMO-CHICKEN-001",
+      "initialCrates": 20
+    },
+    {
+      "productId": "PRD-005",
+      "productName": "Prepared salad",
+      "packDescription": "250 gram sealed bag",
+      "packsPerCrate": 12,
+      "batchId": "DEMO-SALAD-001",
+      "initialCrates": 20
+    }
+  ]
+}

@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" xmlns:di="http://www.omg.org/spec/DD/20100524/DI" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:zeebe="http://camunda.org/schema/zeebe/1.0" xmlns:modeler="http://camunda.org/schema/modeler/1.0" id="ColdChainDefinitions" targetNamespace="http://cold-chain.example/bpmn" modeler:executionPlatform="Camunda Cloud" modeler:executionPlatformVersion="8.8.0">
+  <bpmn:process id="ShipmentTransport" name="P2 Transport handoff" isExecutable="true">
+    <bpmn:startEvent id="DispatchReceived" name="Shipment dispatched">
+      <bpmn:outgoing>Flow_1</bpmn:outgoing>
+      <bpmn:messageEventDefinition id="DispatchReceivedDefinition" messageRef="Message_ShipmentDispatched" />
+    </bpmn:startEvent>
+    <bpmn:serviceTask id="StartTransport" name="Register transport handoff">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="p2-start-transport" retries="3" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_1</bpmn:incoming>
+      <bpmn:outgoing>Flow_2</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:intermediateCatchEvent id="WaitForTransportImplementation" name="Await transport workflow">
+      <bpmn:incoming>Flow_2</bpmn:incoming>
+      <bpmn:outgoing>Flow_3</bpmn:outgoing>
+      <bpmn:messageEventDefinition id="WaitForTransportImplementationDefinition" messageRef="Message_TransportContinuation" />
+    </bpmn:intermediateCatchEvent>
+    <bpmn:endEvent id="TransportCompleted" name="Transport completed">
+      <bpmn:incoming>Flow_3</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:sequenceFlow id="Flow_1" sourceRef="DispatchReceived" targetRef="StartTransport" />
+    <bpmn:sequenceFlow id="Flow_2" sourceRef="StartTransport" targetRef="WaitForTransportImplementation" />
+    <bpmn:sequenceFlow id="Flow_3" sourceRef="WaitForTransportImplementation" targetRef="TransportCompleted" />
+  </bpmn:process>
+  <bpmn:message id="Message_ShipmentDispatched" name="ShipmentDispatched">
+  </bpmn:message>
+  <bpmn:message id="Message_TransportContinuation" name="TransportContinuation">
+    <bpmn:extensionElements>
+      <zeebe:subscription correlationKey="=shipmentId" />
+    </bpmn:extensionElements>
+  </bpmn:message>
+  <bpmndi:BPMNDiagram id="Diagram">
+    <bpmndi:BPMNPlane id="Plane" bpmnElement="ShipmentTransport">
+      <bpmndi:BPMNShape id="DispatchReceived_di" bpmnElement="DispatchReceived">
+        <dc:Bounds x="160" y="102" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="133" y="143" width="100" height="40" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="StartTransport_di" bpmnElement="StartTransport">
+        <dc:Bounds x="340" y="80" width="100" height="80" />
+        <bpmndi:BPMNLabel />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="WaitForTransportImplementation_di" bpmnElement="WaitForTransportImplementation">
+        <dc:Bounds x="520" y="102" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="493" y="143" width="100" height="40" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="TransportCompleted_di" bpmnElement="TransportCompleted">
+        <dc:Bounds x="700" y="102" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="673" y="143" width="100" height="40" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="Flow_1_di" bpmnElement="Flow_1">
+        <di:waypoint x="196" y="120" />
+        <di:waypoint x="340" y="120" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_2_di" bpmnElement="Flow_2">
+        <di:waypoint x="440" y="120" />
+        <di:waypoint x="520" y="120" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_3_di" bpmnElement="Flow_3">
+        <di:waypoint x="556" y="120" />
+        <di:waypoint x="700" y="120" />
+      </bpmndi:BPMNEdge>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+</bpmn:definitions>
