@@ -160,10 +160,10 @@ def main():
             ),
         )
         wait(
-            "P2 waiting",
+            "P2 waiting for arrival",
             lambda: engine_records(
                 record["p2ProcessInstanceKey"],
-                "WaitForTransportImplementation",
+                "WaitForShipmentArrived",
                 "ELEMENT_ACTIVATED",
             ),
         )

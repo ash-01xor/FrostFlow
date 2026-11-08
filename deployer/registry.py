@@ -108,7 +108,17 @@ class Registry:
 
     @staticmethod
     def event(
-        db, record, activity, actor="system", process="P1", event_id=None, payload=None
+        db,
+        record,
+        activity,
+        actor="system",
+        process="P1",
+        event_id=None,
+        payload=None,
+        occurred_at=None,
+        recorded_at=None,
+        source=None,
+        input_mode=None,
     ):
         event_id = event_id or f"{process}:{record['shipmentId']}:{activity}"
         row = db.execute("SELECT data FROM events WHERE id=?", (event_id,)).fetchone()
@@ -132,10 +142,10 @@ class Registry:
             eventType=activity,
             shipmentId=record["shipmentId"],
             journeyId=record["journeyId"],
-            occurredAt=stamp,
-            recordedAt=stamp,
-            source="preparation" if process == "P1" else "transport",
-            inputMode="system" if actor == "system" else "manual",
+            occurredAt=occurred_at or stamp,
+            recordedAt=recorded_at or stamp,
+            source=source or ("preparation" if process == "P1" else "transport"),
+            inputMode=input_mode or ("system" if actor == "system" else "manual"),
             actor=actor,
             role="integration" if actor == "system" else "operator",
             outcome="success",
@@ -522,7 +532,7 @@ class Registry:
             if record.get("p2ProcessInstanceKey") is None:
                 record.update(
                     p2ProcessInstanceKey=str(key),
-                    transportState="AWAITING_TRANSPORT_IMPLEMENTATION",
+                    transportState="AWAITING_JOURNEY_START",
                 )
             # An acknowledgement retry must preserve progress made by P2 after
             # its first registration, including eventual vehicle release.
@@ -557,6 +567,205 @@ class Registry:
                     "temperatureProfileId",
                 )
             }
+
+    def queue_transport_event(
+        self, shipment_id, event_type, event_id, occurred_at, payload, source
+    ):
+        """Persist one manual/test P2 message and its retry identity atomically."""
+        expected = {
+            "ShipmentArrived": "IN_TRANSIT",
+            "ReceiptAcknowledged": "ARRIVED",
+        }
+        if event_type not in expected:
+            raise ValueError("unsupported P2 transport event")
+        with self.transaction() as db:
+            record = self.read(db, shipment_id)
+            identity = f"transport-input:{shipment_id}:{event_type}"
+            old = db.execute(
+                "SELECT data FROM results WHERE id=?", (identity,)
+            ).fetchone()
+            if old:
+                accepted = json.loads(old[0])
+                previous = accepted["event"]
+                same = all(
+                    previous.get(field) == value
+                    for field, value in {
+                        "eventId": event_id,
+                        "eventType": event_type,
+                        "shipmentId": shipment_id,
+                        "journeyId": record["journeyId"],
+                        "occurredAt": occurred_at,
+                        "source": source,
+                        "inputMode": "manual",
+                        "payload": payload,
+                    }.items()
+                )
+                if not same:
+                    raise Conflict(
+                        f"{event_type} already accepted; eventId or payload differs"
+                    )
+                return accepted
+
+            if not record.get("p2ProcessInstanceKey"):
+                raise Conflict("transport process has not registered this shipment")
+            if record.get("transportState") != expected[event_type]:
+                raise Conflict(
+                    f"{event_type} requires {expected[event_type]}, "
+                    f"found {record.get('transportState')}"
+                )
+            if payload.get("recipientId") != record["recipientId"]:
+                raise Conflict("recipientId must match the dispatched shipment")
+            if (
+                event_type == "ReceiptAcknowledged"
+                and payload.get("quantityReceived") != record["quantity"]
+            ):
+                raise Conflict(
+                    "quantityReceived must match the dispatched crate quantity"
+                )
+            if db.execute(
+                "SELECT 1 FROM events WHERE id=?", (event_id,)
+            ).fetchone():
+                raise Conflict("eventId is already used by another recorded event")
+            for (raw,) in db.execute(
+                "SELECT data FROM results WHERE id LIKE 'transport-input:%'"
+            ):
+                queued_event = json.loads(raw)["event"]
+                if queued_event["eventId"] == event_id:
+                    raise Conflict("eventId is already queued for another event")
+
+            event = dict(
+                eventId=event_id,
+                eventType=event_type,
+                shipmentId=shipment_id,
+                journeyId=record["journeyId"],
+                occurredAt=occurred_at,
+                recordedAt=now(),
+                source=source,
+                inputMode="manual",
+                payload=payload,
+            )
+            variable = (
+                "arrivalEvent"
+                if event_type == "ShipmentArrived"
+                else "receiptEvent"
+            )
+            message_id = f"P2:{shipment_id}:{event_type}:{event_id}"
+            accepted = {"messageId": message_id, "event": event}
+            self.enqueue(
+                db,
+                message_id,
+                event_type,
+                shipment_id,
+                {"shipmentId": shipment_id, variable: event},
+            )
+            db.execute(
+                "INSERT INTO results VALUES (?,?)",
+                (identity, json.dumps(accepted)),
+            )
+            return accepted
+
+    @staticmethod
+    def require_transport_event(db, shipment_id, event_type, event):
+        identity = f"transport-input:{shipment_id}:{event_type}"
+        row = db.execute("SELECT data FROM results WHERE id=?", (identity,)).fetchone()
+        if row is None:
+            raise Conflict(f"{event_type} was not accepted by the manual/test input")
+        accepted = json.loads(row[0])["event"]
+        if accepted != event:
+            raise Conflict(f"{event_type} does not match its accepted message")
+        return accepted
+
+    @staticmethod
+    def require_transport_instance(record, key):
+        if record.get("p2ProcessInstanceKey") != str(key):
+            raise Conflict("wrong P2 engine instance")
+
+    def start_journey(self, shipment_id, key):
+        with self.transaction() as db:
+            record = self.read(db, shipment_id)
+            self.require_transport_instance(record, key)
+            if db.execute(
+                "SELECT 1 FROM events WHERE id=?",
+                (f"P2:{shipment_id}:JourneyStarted",),
+            ).fetchone():
+                return record
+            if record.get("transportState") != "AWAITING_JOURNEY_START":
+                raise Conflict(
+                    "journey can start only after transport handoff registration"
+                )
+            record["transportState"] = "IN_TRANSIT"
+            self.event(db, record, "JourneyStarted", process="P2")
+            self.save(db, record)
+            return record
+
+    def record_arrival(self, shipment_id, key, arrival_event):
+        with self.transaction() as db:
+            record = self.read(db, shipment_id)
+            self.require_transport_instance(record, key)
+            accepted = self.require_transport_event(
+                db, shipment_id, "ShipmentArrived", arrival_event
+            )
+            if db.execute(
+                "SELECT 1 FROM events WHERE id=?", (accepted["eventId"],)
+            ).fetchone():
+                return record
+            if record.get("transportState") != "IN_TRANSIT":
+                raise Conflict(
+                    f"arrival recording requires IN_TRANSIT, "
+                    f"found {record.get('transportState')}"
+                )
+            record["transportState"] = "ARRIVED"
+            self.event(
+                db,
+                record,
+                "ShipmentArrived",
+                actor=accepted["source"],
+                process="P2",
+                event_id=accepted["eventId"],
+                payload=accepted["payload"],
+                occurred_at=accepted["occurredAt"],
+                recorded_at=accepted["recordedAt"],
+                source=accepted["source"],
+                input_mode=accepted["inputMode"],
+            )
+            self.save(db, record)
+            return record
+
+    def release_vehicle(self, shipment_id, key, receipt_event):
+        with self.transaction() as db:
+            record = self.read(db, shipment_id)
+            self.require_transport_instance(record, key)
+            accepted = self.require_transport_event(
+                db, shipment_id, "ReceiptAcknowledged", receipt_event
+            )
+            if record.get("vehicleReleased"):
+                if not db.execute(
+                    "SELECT 1 FROM events WHERE id=?",
+                    (f"P2:{shipment_id}:VehicleReleased",),
+                ).fetchone():
+                    raise Conflict("vehicle release state has no recorded activity")
+                return record
+            if record.get("transportState") != "ARRIVED":
+                raise Conflict(
+                    "vehicle can be released only after arrival and receipt acknowledgement"
+                )
+            record.update(transportState="COMPLETED", vehicleReleased=True)
+            self.event(
+                db,
+                record,
+                "ReceiptAcknowledged",
+                actor=accepted["source"],
+                process="P2",
+                event_id=accepted["eventId"],
+                payload=accepted["payload"],
+                occurred_at=accepted["occurredAt"],
+                recorded_at=accepted["recordedAt"],
+                source=accepted["source"],
+                input_mode=accepted["inputMode"],
+            )
+            self.event(db, record, "VehicleReleased", process="P2")
+            self.save(db, record)
+            return record
 
     def events(self, shipment_id):
         with self.transaction() as db:

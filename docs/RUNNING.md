@@ -1,6 +1,6 @@
 # Running, testing and understanding P1
 
-Run commands from the repository root. P1 responsible student: **Ashvanth**. The implemented scope is shipment preparation, including stock shortage/cancellation, and a P2 handoff that registers a transport instance and waits for its remaining workflow.
+Run commands from the repository root. P1 responsible student: **Ashvanth**. The implemented scope includes shipment preparation, a P2 transport workflow exercised through manual arrival/receipt inputs, and the P1 stock shortage/cancellation paths.
 
 ## Demonstration dataset
 
@@ -61,7 +61,7 @@ For the normal P1 demonstration:
 | 1, then A | Create 15-crate milk order (product 1); reserve stock and await loading | Find P1's printed key in Operate; it is waiting for a warehouse confirmation |
 | 4, then A | Dispatch is rejected | Loading verification is required |
 | 3, then A | Confirm the simulated loading checks | P1 moves to the dispatch-approval wait |
-| 4, then A | Dispatch; register and acknowledge P2 | P1 completes; a separate P2 instance waits for the remaining transport implementation |
+| 4, then A | Dispatch; register P2 | P1 completes; P2 starts the journey and waits for the manual arrival input |
 
 For a stock exception, choose **1, B**, then milk again: 10 milk crates are requested while only five milk crates remain. The other four products still have 20 crates each; they cannot satisfy this order. Show the stock-wait gateway, then choose either **5, B** to replenish five milk crates and continue preparation, or **6, B** to cancel. After cancelling B, **1, C** creates another stock-wait case on the released vehicle if you want to rehearse the other branch. Menu **2** displays state/keys; **7** displays the activity history; **8** lists product/batch stock; **0** exits without stopping the stack.
 
@@ -69,7 +69,7 @@ Operate displays engine execution. The terminal represents the person submitting
 
 The dataset must be prepared before recording/presenting. The menu preserves existing data and does not reset containers or reservations. A used dataset may have unavailable vehicles even if stock remains; use the isolated-dataset instructions below to rehearse again.
 
-For the final **three-minute** project demo, reserve roughly 25 seconds for preparation. Build one connected story as later parts become available: dispatch → temperature incident → investigation/hold → authorised resolution → corrective work/claim → compliance results. Show process behaviour and evidence at each transition. The current implementation supports only preparation and the initial P2 handoff; the other parts remain planned.
+For the final **three-minute** project demo, reserve roughly 25 seconds for preparation. Build one connected story as later parts become available: dispatch → arrival/receipt → temperature incident → investigation/hold → authorised resolution → corrective work/claim → compliance results. Show process behaviour and evidence at each transition. The GPS simulator and P3–P6 workflows remain planned.
 
 ## Manual walkthrough
 
@@ -162,9 +162,27 @@ curl -s http://localhost:5001/shipments/S-003
 curl -s http://localhost:5001/shipments/S-003/events
 ```
 
-P1 reaches `DISPATCHED`. Poll until `handoffStatus` is `ACKNOWLEDGED`: the record now includes a distinct `p2ProcessInstanceKey` and `transportState: AWAITING_TRANSPORT_IMPLEMENTATION`. P1 completes in Operate; P2 waits at **Await transport workflow**. Inspect P2 variables for shipment, journey, product, batch, unit/pack definition, vehicle, recipient, route, quantity and deadline. Repeat verification/dispatch attempts return 409.
+P1 reaches `DISPATCHED`. Poll until `handoffStatus` is `ACKNOWLEDGED`: the record now includes a distinct `p2ProcessInstanceKey`; P2 starts the journey and waits at **Wait for shipment arrival** with `transportState: IN_TRANSIT`. Inspect P2 variables for shipment, journey, product, batch, unit/pack definition, vehicle, recipient, route, quantity and deadline. Repeat verification/dispatch attempts return 409.
 
-Repeat the loading/dispatch steps for S-001 to inspect two independent transports. P2's GPS simulator, arrival, receipt acknowledgement and vehicle release remain future work. The reserved `TransportContinuation` catch marks that implementation boundary; no completion action is exposed yet. Damaged-packaging handling is outside this increment: all loading checks must be true for verification.
+For the manual P2 skeleton, submit arrival after the journey starts:
+
+```bash
+curl -s -i -X POST http://localhost:5001/shipments/S-001/arrive \
+  -H 'Content-Type: application/json' \
+  -d '{"eventId":"arr-S-001-001","occurredAt":"2026-11-15T10:22:00Z","recipientId":"C-01"}'
+```
+
+P2 records arrival, then waits for **Wait for receipt acknowledgement**. A test receiver can submit:
+
+```bash
+curl -s -i -X POST http://localhost:5001/shipments/S-001/acknowledge-receipt \
+  -H 'Content-Type: application/json' \
+  -d '{"eventId":"receipt-S-001-001","occurredAt":"2026-11-15T10:24:00Z","recipientId":"C-01","quantityReceived":15,"receiptReference":"RCPT-001"}'
+```
+
+These endpoints are manual/test inputs; the receipt endpoint stands in for P3 until its service is connected. Both events are correlated by `shipmentId`. P2 rejects an acknowledgement before arrival and releases the vehicle only after the receipt acknowledgement is processed. Exact retries with the same event ID and content are safe; changed content is rejected.
+
+Repeat the loading/dispatch steps for S-001 to inspect two independent transports. Exercise each P2 instance using its own shipment ID with the manual arrival and receipt endpoints above. The GPS simulator and live P3 connection remain future work. Damaged-packaging handling is outside this increment: all loading checks must be true for verification.
 
 ## What the BPMN and Python each do
 
@@ -273,7 +291,7 @@ Against a fresh, healthy stack:
 .venv/bin/python stage_tests/check_stage1.py
 ```
 
-This executes all three scenarios, checks exported P1 completion and P2 waits, publishes duplicate dispatch messages and checks that only one P2 exists per dispatched shipment. It exports **actual P1 activities** to `runtime/verification-results/execution-log.xes`, replays them against the DCR XML and writes a verification report. P2 activities are deliberately excluded from the P1 conformance trace. Both vehicles remain reserved by the two waiting P2 cases afterwards.
+This executes all three scenarios, checks exported P1 completion and P2 arrival waits, publishes duplicate dispatch messages and checks that only one P2 exists per dispatched shipment. It exports **actual P1 activities** to `runtime/verification-results/execution-log.xes`, replays them against the DCR XML and writes a verification report. P2 activities are deliberately excluded from the P1 conformance trace. Both vehicles remain reserved by the two P2 cases waiting for arrival afterwards.
 
 The reviewed five-product [execution log](../compliance/p1/execution-log.xes) and [verification report](../compliance/p1/verification.json) contain actual execution evidence and source/model hashes from this checkpoint. Regenerate and review them when implementation or models change. The report also records successful ProcessDoctor import/conformance and the metadata-only model correction. Repeat external conformance checking when the rules or log change. P1 ownership is recorded in the project documentation. The BPMN source and PDF omit student attribution at the owner's request. The DCR display title includes the owner; its semantics are unchanged and the report preserves the hashes used in the original checks. Model PDFs can be exported in Modeler or with [bpmn-to-image](https://github.com/bpmn-io/bpmn-to-image):
 
@@ -311,4 +329,4 @@ For disposable data only, `docker compose down -v` removes that project's engine
 - **502 on creation:** engine-start outcome uncertain; inspect engine/logs before retrying. The registry entry is retained.
 - **A pending command/handoff does not advance:** check `docker compose logs communication` and Operate for publication/worker incidents. Published messages expire after 24 hours if unconsumed; recovery is manual.
 
-One communication instance is supported. P2 completion/vehicle release, authenticated users, stock procurement, the shared logger, P4 quality holds, simulator/CEP/API integrations remain outside this increment. P1 external conformance checking is recorded above.
+One communication instance is supported. Live P3 integration, authenticated users, stock procurement, the shared logger, P4 quality holds, and simulator/CEP/API integrations remain outside this increment. P1 external conformance checking is recorded above.
