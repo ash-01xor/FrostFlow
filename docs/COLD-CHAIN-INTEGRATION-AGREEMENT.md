@@ -87,6 +87,54 @@ The Python integration service delivers these messages to the relevant engine or
 
 **Receipt ownership:** P3 records one acknowledgement and informs P2. P2 cannot complete just because GPS shows arrival.
 
+### P2–P3 event contract proposal (pending P3 review)
+
+Use the common event envelope above for both messages. `eventId`, `eventType`, `shipmentId`, `journeyId`, `occurredAt`, `recordedAt`, `source`, `inputMode`, and `payload` are required. Timestamps are ISO 8601 UTC. `occurredAt` is the physical event time; `recordedAt` is when the producer accepted the event. `source` identifies the producer and `inputMode` is `manual` for the initial test endpoints.
+
+Correlate each Zeebe message subscription using `shipmentId`, matching the P2 instance started for that shipment. `journeyId` is required for validation and traceability, but is not the correlation key. Keep message buffering enabled so a valid message that arrives just before its catch event is subscribed is not lost. Each producer assigns a stable `eventId`; an exact retry must not repeat the business effect, and reusing an ID with different content must be rejected. P3 emits one `ReceiptAcknowledged` only after it has recorded the physical receipt.
+
+`ShipmentArrived` — P2 to P3. Required payload: `recipientId`, identifying the expected destination. Optional payload: `latitude` and `longitude`, supplied together when a measured arrival position is available. The common `occurredAt` is the arrival time. Do not require coordinates for the manual/test input.
+
+```json
+{
+  "eventId": "arr-S-001-001",
+  "eventType": "ShipmentArrived",
+  "shipmentId": "S-001",
+  "journeyId": "J-001",
+  "occurredAt": "2026-11-15T10:22:00Z",
+  "recordedAt": "2026-11-15T10:22:03Z",
+  "source": "p2-manual-test",
+  "inputMode": "manual",
+  "payload": {
+    "recipientId": "C-01",
+    "latitude": 48.8566,
+    "longitude": 2.3522
+  }
+}
+```
+
+`ReceiptAcknowledged` — P3 to P2. Required payload: `recipientId` and `quantityReceived` (integer crates physically received). Optional payload: `receiptReference` (the receiver's receipt/slip ID). The common `occurredAt` is the physical receipt time. `recipientId` and `quantityReceived` must match the dispatched shipment for this milestone; discrepancies need an agreed exception path before changing that rule. This event means physical receipt was acknowledged; it does not mean goods passed quality inspection or were admitted to stock.
+
+```json
+{
+  "eventId": "receipt-S-001-001",
+  "eventType": "ReceiptAcknowledged",
+  "shipmentId": "S-001",
+  "journeyId": "J-001",
+  "occurredAt": "2026-11-15T10:24:00Z",
+  "recordedAt": "2026-11-15T10:24:02Z",
+  "source": "p3-manual-test",
+  "inputMode": "manual",
+  "payload": {
+    "recipientId": "C-01",
+    "quantityReceived": 15,
+    "receiptReference": "RCPT-001"
+  }
+}
+```
+
+These field requirements are a proposal, not a team-approved contract. P2 can implement them as the first manual-input baseline while P3 reviews them. If P3 needs to report partial quantities, damaged goods, or a mismatched destination, agree on the receiving exception behavior before expanding the schema.
+
 **Replacement ownership:** P5 requests a linked shipment through P1. It waits for that shipment's successful receiving outcome and for the recorded handling of the original goods. A replacement's dispatch alone is insufficient.
 
 **Message timing:** configure buffering for Camunda messages that may arrive before a waiting subscription. Match messages to the intended process instance using the business ID; include incident and command IDs where episodes could otherwise be confused. Test this during the first process integration.
@@ -99,7 +147,7 @@ P1 accepts an order before checking stock. A shortage keeps a real P1 instance a
 
 Dispatch records the agreed `ShipmentDispatched` envelope and durable outbox entry together. Its payload is passed as `dispatchEvent` to P2's message start. P2's registration worker checks the event against the journal, persists its engine key and acknowledges the outbox. Repeated worker delivery reuses that registration; a different P2 instance is prevented from repeating the business effect. Message IDs and active-start correlation also suppress repeated engine starts within the supported retention period.
 
-The current P2 instance waits at `WaitForTransportImplementation`. GPS movement, arrival, receipt and vehicle release still belong to P2's remaining implementation. Publication succeeds before acknowledgement; stock/loading/dispatch APIs therefore return accepted status while workers may still be processing. Published messages are not repeatedly sent; uncertain pending publications are retried for at most 24 hours, after which recovery requires engine inspection. The registry and engine data must be preserved together. Dataset version 3 uses five product/batch inventory rows; legacy pooled-stock datasets are preserved and rejected by the updated service until a fresh project/directory is selected. The [dataset reference](RUNNING.md#demonstration-dataset) defines the seed values. Product/batch identity is recorded in each activity payload and exported as XES attributes; the DCR graph continues to check ordering rather than numeric stock or temperature limits.
+The P2 BPMN source now models `StartJourney`, the `ShipmentArrived` wait, `RecordArrival`, the `ReceiptAcknowledged` wait and `ReleaseVehicle`. The Python workers and manual event endpoints for these steps are not implemented yet; only `p2-start-transport` is registered, so a newly deployed instance cannot complete the skeleton yet. GPS movement and vehicle release remain unimplemented. Publication succeeds before acknowledgement; stock/loading/dispatch APIs therefore return accepted status while workers may still be processing. Published messages are not repeatedly sent; uncertain pending publications are retried for at most 24 hours, after which recovery requires engine inspection. The registry and engine data must be preserved together. Dataset version 3 uses five product/batch inventory rows; legacy pooled-stock datasets are preserved and rejected by the updated service until a fresh project/directory is selected. The [dataset reference](RUNNING.md#demonstration-dataset) defines the seed values. Product/batch identity is recorded in each activity payload and exported as XES attributes; the DCR graph continues to check ordering rather than numeric stock or temperature limits.
 
 ### P2 and P3 development handover
 
@@ -107,7 +155,7 @@ Use the existing Compose stack and shared Python service. Each owner can build/t
 
 | Area | Files and current boundary | Next work |
 | --- | --- | --- |
-| P2 model | `bpmn/transport.bpmn`, process ID `ShipmentTransport` | Preserve the `ShipmentDispatched` message start and `p2-start-transport` registration task. Replace `WaitForTransportImplementation` and its reserved `TransportContinuation` message with actual journey/arrival/receipt handling. |
+| P2 model | `bpmn/transport.bpmn`, process ID `ShipmentTransport` | The source preserves the `ShipmentDispatched` message start and `p2-start-transport` registration task, then models `p2-start-journey`, `ShipmentArrived`, `p2-record-arrival`, `ReceiptAcknowledged` and `p2-release-vehicle`. Message catches correlate on `shipmentId`. Implement and register the workers and manual/test message endpoints next. |
 | P2 workers | `deployer/app.py`: `start_transport`, worker registration in `main` | Add handlers with matching BPMN job types. Register each handler and fetch the variables it needs. The existing `JOB_TYPES` list and handler sequence must stay in the same order. |
 | Shared business state | `deployer/registry.py`: `start_transport`, transactions and activity journal | Keep P1's `state` as preparation status; store transport progress in `transportState`. Preserve reservations until P2's completion rule allows vehicle release. Use transactions and stable activity identities for retries. |
 | P3 model/service | Not implemented | Add a receiving BPMN resource and deploy it from `main`, with matching workers and human-action endpoints. Consume `ShipmentArrived` once, record receipt, and send `ReceiptAcknowledged` to P2. |
