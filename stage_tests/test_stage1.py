@@ -450,6 +450,25 @@ class Preparation(unittest.TestCase):
         self.create(shipment="S-next", journey="J-next", vehicle="V-01")
 
     def test_p2_manual_event_rejects_invalid_time_and_mismatched_receipt(self):
+        unknown_arrival = self.http.post(
+            "/shipments/not-known/arrive",
+            json={
+                "eventId": "unknown-arrival",
+                "occurredAt": "2026-12-01T10:22:00Z",
+                "recipientId": "C-01",
+            },
+        )
+        unknown_receipt = self.http.post(
+            "/shipments/not-known/acknowledge-receipt",
+            json={
+                "eventId": "unknown-receipt",
+                "occurredAt": "2026-12-01T10:24:00Z",
+                "recipientId": "C-01",
+                "quantityReceived": 3,
+            },
+        )
+        self.assertEqual(unknown_arrival.status_code, 404)
+        self.assertEqual(unknown_receipt.status_code, 404)
         self.loading_wait()
         self.verify()
         self.db.advance(
