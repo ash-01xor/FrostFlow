@@ -23,13 +23,13 @@ The [dataset reference](docs/RUNNING.md#demonstration-dataset) lists all product
 | Process | Execution platform | Status |
 | --- | --- | --- |
 | P1 — Shipment preparation | Camunda / Zeebe | Stock wait/cancellation, dispatch handoff and local compliance verification implemented |
-| P2 — Transport and delivery | Camunda / Zeebe | Dispatch receiver implemented; transport workflow planned |
+| P2 — Transport and delivery | Camunda / Zeebe | Manual-input journey, arrival, receipt acknowledgement and vehicle release flow implemented; simulator/integrations planned |
 | P3 — Receiving and stock admission | Camunda / Zeebe | Planned |
 | P4 — Quality incident investigation | DCR | Planned |
 | P5 — Corrective fulfilment | Camunda / Zeebe | Planned |
 | P6 — Supplier claim resolution | Camunda / Zeebe | Planned |
 
-P1 supports shipment creation, stock checking, replenishment or cancellation during shortages, loading verification and dispatch. Dispatch starts a protected P2 transport instance carrying the shipment details. P1 has a DCR compliance graph, an XES execution log and local conformance checks. The remaining transport workflow, P3–P6, Siddhi processing and external API adapters are under development; P1 course-tool compliance checking has passed.
+P1 supports shipment creation, stock checking, replenishment or cancellation during shortages, loading verification and dispatch. Dispatch starts a protected P2 transport instance carrying the shipment details. P2 can be exercised through manual arrival and receipt inputs; the vehicle remains reserved until receipt acknowledgement. P1 has a DCR compliance graph, an XES execution log and local conformance checks. The GPS simulator, P3–P6, Siddhi processing and external API adapters are under development; P1 course-tool compliance checking has passed.
 
 ## Architecture
 
@@ -89,7 +89,7 @@ With the stack running and both vehicles available, run the engine integration c
 .venv/bin/python stage_tests/check_stage1.py
 ```
 
-The integration check exercises normal dispatch, stock-wait cancellation and replenishment/recheck; it leaves two P2 instances waiting for transport implementation. See the [run guide](docs/RUNNING.md) before repeating it or switching to a manual scenario.
+The integration check exercises normal dispatch, stock-wait cancellation and replenishment/recheck; it leaves two P2 instances waiting for `ShipmentArrived`. See the [run guide](docs/RUNNING.md) before repeating it or switching to a manual scenario.
 
 The five-product checkpoint passes **29 offline tests**, both BPMN lints, Compose validation, live P1/P2 scenarios and persistence after stack recreation. A clean-copy run used fresh dependencies and engine data; a later metadata-only XML correction passed local replay and ProcessDoctor. The [verification report](compliance/p1/verification.json) records source/model hashes, inventory and results; the [XES log](compliance/p1/execution-log.xes) contains the actual P1 activities. ProcessDoctor reports all three real traces as conforming with zero violations; [reproduction steps and screenshots](docs/RUNNING.md#processdoctor-conformance-check) are included.
 

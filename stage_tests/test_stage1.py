@@ -353,6 +353,157 @@ class Preparation(unittest.TestCase):
             1,
         )
 
+    def test_p2_manual_arrival_and_receipt_gate_vehicle_release(self):
+        self.loading_wait()
+        self.verify()
+        self.db.advance(
+            "S-test",
+            self.key,
+            "AWAITING_LOADING",
+            "AWAITING_DISPATCH",
+            "LoadingVerified",
+        )
+        self.db.reserve_command("S-test", "DispatchApproved", "dispatcher")
+        self.db.advance(
+            "S-test", self.key, "AWAITING_DISPATCH", "DISPATCHED", "ShipmentDispatched"
+        )
+        dispatch_event = next(
+            event
+            for event in self.db.events("S-test")
+            if event["eventType"] == "ShipmentDispatched"
+        )
+        self.db.start_transport("S-test", 999, dispatch_event)
+        self.db.start_journey("S-test", 999)
+        self.assertEqual(self.db.get("S-test")["transportState"], "IN_TRANSIT")
+        self.assertFalse(self.db.get("S-test")["vehicleReleased"])
+
+        receipt = dict(
+            eventId="receipt-1",
+            occurredAt="2026-12-01T10:24:00Z",
+            recipientId="C-01",
+            quantityReceived=3,
+        )
+        self.assertEqual(
+            self.http.post(
+                "/shipments/S-test/acknowledge-receipt", json=receipt
+            ).status_code,
+            409,
+        )
+
+        arrival = dict(
+            eventId="arrival-1",
+            eventType="ShipmentArrived",
+            shipmentId="S-test",
+            journeyId="J-test",
+            occurredAt="2026-12-01T10:22:00Z",
+            source="p2-manual-test",
+            inputMode="manual",
+            payload={
+                "recipientId": "C-01",
+                "latitude": 48.8566,
+                "longitude": 2.3522,
+            },
+        )
+        for _ in range(2):
+            response = self.http.post("/shipments/S-test/arrive", json=arrival)
+            self.assertEqual(response.status_code, 202, response.json)
+        self.assertEqual(
+            self.http.post(
+                "/shipments/S-test/arrive",
+                json={**arrival, "payload": {**arrival["payload"], "recipientId": "C-02"}},
+            ).status_code,
+            409,
+        )
+        arrival_message = next(
+            message
+            for message in self.db.pending_messages()
+            if message["name"] == "ShipmentArrived"
+        )
+        arrival_event = arrival_message["variables"]["arrivalEvent"]
+        self.db.record_arrival("S-test", 999, arrival_event)
+        record = self.db.get("S-test")
+        self.assertEqual(record["transportState"], "ARRIVED")
+        self.assertFalse(record["vehicleReleased"])
+
+        response = self.http.post(
+            "/shipments/S-test/acknowledge-receipt", json=receipt
+        )
+        self.assertEqual(response.status_code, 202, response.json)
+        receipt_message = next(
+            message
+            for message in self.db.pending_messages()
+            if message["name"] == "ReceiptAcknowledged"
+        )
+        receipt_event = receipt_message["variables"]["receiptEvent"]
+        self.db.release_vehicle("S-test", 999, receipt_event)
+        record = self.db.get("S-test")
+        self.assertEqual(record["transportState"], "COMPLETED")
+        self.assertTrue(record["vehicleReleased"])
+        self.db.release_vehicle("S-test", 999, receipt_event)
+        self.assertEqual(
+            sum(
+                event["eventType"] == "VehicleReleased"
+                for event in self.db.events("S-test")
+            ),
+            1,
+        )
+        self.create(shipment="S-next", journey="J-next", vehicle="V-01")
+
+    def test_p2_manual_event_rejects_invalid_time_and_mismatched_receipt(self):
+        self.loading_wait()
+        self.verify()
+        self.db.advance(
+            "S-test",
+            self.key,
+            "AWAITING_LOADING",
+            "AWAITING_DISPATCH",
+            "LoadingVerified",
+        )
+        self.db.reserve_command("S-test", "DispatchApproved", "dispatcher")
+        self.db.advance(
+            "S-test", self.key, "AWAITING_DISPATCH", "DISPATCHED", "ShipmentDispatched"
+        )
+        dispatch_event = next(
+            event
+            for event in self.db.events("S-test")
+            if event["eventType"] == "ShipmentDispatched"
+        )
+        self.db.start_transport("S-test", 999, dispatch_event)
+        self.db.start_journey("S-test", 999)
+        arrival = dict(
+            eventId="arrival-bad-time",
+            occurredAt="not-a-timestamp",
+            recipientId="C-01",
+        )
+        self.assertEqual(
+            self.http.post("/shipments/S-test/arrive", json=arrival).status_code,
+            400,
+        )
+        arrival["occurredAt"] = "2026-12-01T10:22:00Z"
+        self.assertEqual(
+            self.http.post("/shipments/S-test/arrive", json=arrival).status_code,
+            202,
+        )
+        arrival_event = next(
+            message["variables"]["arrivalEvent"]
+            for message in self.db.pending_messages()
+            if message["name"] == "ShipmentArrived"
+        )
+        self.db.record_arrival("S-test", 999, arrival_event)
+        bad_receipt = dict(
+            eventId="receipt-wrong-count",
+            occurredAt="2026-12-01T10:24:00Z",
+            recipientId="C-01",
+            quantityReceived=2,
+        )
+        self.assertEqual(
+            self.http.post(
+                "/shipments/S-test/acknowledge-receipt", json=bad_receipt
+            ).status_code,
+            409,
+        )
+        self.assertFalse(self.db.get("S-test")["vehicleReleased"])
+
     def test_invalid_input(self):
         for change in (
             {"quantity": True},
@@ -611,6 +762,7 @@ class Preparation(unittest.TestCase):
                 "CREATE TABLE inventory (id INTEGER PRIMARY KEY, available INTEGER NOT NULL)"
             )
             db.execute("INSERT INTO inventory VALUES (1,17)")
+        db.close()
         before = path.read_bytes()
         with self.assertRaisesRegex(ValueError, "legacy pooled stock"):
             Registry(path)

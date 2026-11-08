@@ -1,4 +1,4 @@
-"""Interactive demonstration controls for the current P1/P2 implementation.
+"""Interactive demonstration controls for the manual-input P1/P2 workflow.
 
 Uses the application's HTTP API; no Docker commands or data resets are performed.
 Run from the repository root: python3 tools/demo.py
@@ -23,7 +23,7 @@ LOCATIONS = {
     "AWAITING_LOADING": "In Operate, find P1 waiting at 'Await loading verification'.",
     "WAITING_STOCK": "In Operate, find P1 at 'Await stock or cancellation'.",
     "AWAITING_DISPATCH": "In Operate, find P1 waiting at 'Await dispatch approval'.",
-    "DISPATCHED": "P1 should finish; open P2 to see 'Await transport workflow'.",
+    "DISPATCHED": "P1 should finish; P2 starts the journey and waits for arrival.",
     "CANCELLED": "P1 should finish at 'Shipment cancelled'; no P2 is started.",
 }
 
