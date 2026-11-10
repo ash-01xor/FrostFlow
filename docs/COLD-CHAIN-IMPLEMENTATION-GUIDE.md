@@ -101,7 +101,7 @@ Ashvanth is responsible for P1. Assign one student to each remaining process. Ev
 
 **Coordinate with P4:** read the same recorded quality status, so the receiving process cannot overlook an investigation.
 
-### Person D — P4: Quality incident investigation · DCR
+### Abid — P4: Quality incident investigation · DCR
 
 **Build:** open incident → review evidence → request/complete additional checks if needed → decide release, replacement, or return → close investigation.
 
