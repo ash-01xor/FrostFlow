@@ -1,4 +1,4 @@
-"""Interactive demonstration controls for the current P1/P2 implementation.
+"""Interactive demonstration controls for the current P1/P2/P3 implementation.
 
 Uses the application's HTTP API; no Docker commands or data resets are performed.
 Run from the repository root: python3 tools/demo.py
@@ -52,6 +52,15 @@ def show(record):
     if record.get("p2ProcessInstanceKey"):
         print(f"P2 instance key: {record['p2ProcessInstanceKey']}")
         print(f"Dispatch handoff: {record.get('handoffStatus')}")
+    if record.get("p3ProcessInstanceKey"):
+        print(f"P3 instance key: {record['p3ProcessInstanceKey']}")
+        print(
+            f"Receipt: {record.get('receiptStatus', 'pending')} | "
+            f"Inspection: {record.get('inspectionStatus', 'pending')} | "
+            f"Admission: {record.get('admissionStatus', 'not admitted')}"
+        )
+    elif record.get("p3StartStatus"):
+        print(f"P3 start status: {record['p3StartStatus']}")
     if record.get("pendingCommand"):
         print("The accepted action is still being processed.")
     print(LOCATIONS.get(record["state"], "Inspect the process in Operate."))
@@ -70,6 +79,12 @@ def wait_for_action(base, shipment_id, action, old_wait_key=None):
             finished = record.get("handoffStatus") == "ACKNOWLEDGED"
         elif action == "verify-loading":
             finished = record["state"] == "AWAITING_DISPATCH"
+        elif action == "receiving":
+            finished = record.get("inspectionStatus") in ("PASSED", "FAILED") and (
+                record.get("admissionStatus") == "ADMITTED"
+                or record.get("inspectionStatus") == "FAILED"
+                or record.get("qualityStatus") not in ("CLEAR", "RELEASED")
+            )
         elif action == "cancel":
             finished = record["state"] == "CANCELLED"
         else:
@@ -129,7 +144,18 @@ def perform(base, choice):
                 print(f"{event['process']}: {event['eventType']}")
         return
     old_wait_key = None
-    if choice == "1":
+    if choice == "9":
+        passed_input = input("Inspection passed? [Y/n]: ").strip().lower()
+        if passed_input not in ("", "y", "yes", "n", "no"):
+            raise ValueError("Choose Y or N.")
+        action = "receiving"
+        path += "/receiving"
+        data = {
+            "receiver": "receiver-demo",
+            "inspector": "inspector-demo",
+            "passed": passed_input not in ("n", "no"),
+        }
+    elif choice == "1":
         stock = inventory(base)
         selected = (
             input("Product [1-5, Enter=1 for milk shortage scenario]: ").strip() or "1"
@@ -151,7 +177,7 @@ def perform(base, choice):
             batchId=product["batchId"],
             deliveryDeadline=deadline,
         )
-    else:
+    elif choice != "9":
         action = {
             "3": "verify-loading",
             "4": "dispatch",
@@ -230,12 +256,13 @@ def main():
                 "3 Verify loading         4 Dispatch (also use this to demonstrate a blocked attempt)"
             )
             print("5 Replenish 5 crates      6 Cancel a stock-waiting shipment")
-            print("7 Show activity history  8 Show product inventory  0 Exit")
+            print("7 Show activity history  8 Show product inventory")
+            print("9 Start P3 receiving     0 Exit")
             choice = input("Action: ").strip()
             if choice == "0":
                 return 0
-            if choice not in "12345678" or len(choice) != 1:
-                print("Choose an action from 0 to 8.")
+            if choice not in "123456789" or len(choice) != 1:
+                print("Choose an action from 0 to 9.")
                 continue
             try:
                 perform(base, choice)

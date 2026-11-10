@@ -52,7 +52,7 @@ After starting a fresh stack, run:
 python3 tools/demo.py
 ```
 
-This terminal menu sends the same application requests as the commands below. It waits for the resulting state and prints the P1/P2 instance keys to find in Operate. Choose an action number, then shipment **A**, **B** or **C**. Creation also offers a choice of all five products; press Enter to use milk for the shortage scenario. `python3 tools/demo.py --check` checks readiness and stock without changing data.
+This terminal menu sends the same application requests as the commands below. It waits for the resulting state and prints the P1/P2/P3 instance keys to find in Operate. Choose an action number, then shipment **A**, **B** or **C**. Creation also offers a choice of all five products; press Enter to use milk for the shortage scenario. `python3 tools/demo.py --check` checks readiness and stock without changing data.
 
 For the normal P1 demonstration:
 
@@ -67,9 +67,11 @@ For a stock exception, choose **1, B**, then milk again: 10 milk crates are requ
 
 Operate displays engine execution. The terminal represents the person submitting actions; this setup has no Tasklist forms for those actions. Keep both windows open, refresh Operate when needed, and use its instance key and diagram to explain the current wait. The menu explicitly confirms demonstration loading checks; it does not inspect physical goods.
 
+To test P3, first create a shipment with menu **1**, then choose **9** and the same shipment letter. Choose whether the simulated inspection passes. The menu starts one `StockReceiving` instance; its receipt and inspection values are supplied at startup, and its Zeebe workers continue through the admission decision. Find the printed P3 instance key in Operate. A passing inspection admits stock when the shipment's quality status allows it; a failed inspection ends without admitting stock. This P3 model has no user-task wait states. Do not also use the direct `/receive`, `/inspect` or `/admit` API endpoints for the same test shipment.
+
 The dataset must be prepared before recording/presenting. The menu preserves existing data and does not reset containers or reservations. A used dataset may have unavailable vehicles even if stock remains; use the isolated-dataset instructions below to rehearse again.
 
-For the final **three-minute** project demo, reserve roughly 25 seconds for preparation. Build one connected story as later parts become available: dispatch → temperature incident → investigation/hold → authorised resolution → corrective work/claim → compliance results. Show process behaviour and evidence at each transition. The current implementation supports only preparation and the initial P2 handoff; the other parts remain planned.
+For the final **three-minute** project demo, reserve roughly 25 seconds for preparation. Build one connected story as later parts become available: dispatch → temperature incident → investigation/hold → authorised resolution → corrective work/claim → compliance results. Show process behaviour and evidence at each transition. The current implementation supports preparation, the initial P2 handoff and the P3 receiving/admission flow; P4–P6 remain planned.
 
 ## Manual walkthrough
 

@@ -24,12 +24,12 @@ The [dataset reference](docs/RUNNING.md#demonstration-dataset) lists all product
 | --- | --- | --- |
 | P1 — Shipment preparation | Camunda / Zeebe | Stock wait/cancellation, dispatch handoff and local compliance verification implemented |
 | P2 — Transport and delivery | Camunda / Zeebe | Dispatch receiver implemented; transport workflow planned |
-| P3 — Receiving and stock admission | Camunda / Zeebe | Planned |
+| P3 — Receiving and stock admission | Camunda / Zeebe | Executable receipt, inspection and admission flow |
 | P4 — Quality incident investigation | DCR | Planned |
 | P5 — Corrective fulfilment | Camunda / Zeebe | Planned |
 | P6 — Supplier claim resolution | Camunda / Zeebe | Planned |
 
-P1 supports shipment creation, stock checking, replenishment or cancellation during shortages, loading verification and dispatch. Dispatch starts a protected P2 transport instance carrying the shipment details. P1 has a DCR compliance graph, an XES execution log and local conformance checks. The remaining transport workflow, P3–P6, Siddhi processing and external API adapters are under development; P1 course-tool compliance checking has passed.
+P1 supports shipment creation, stock checking, replenishment or cancellation during shortages, loading verification and dispatch. Dispatch starts a protected P2 transport instance carrying the shipment details. P3 runs receipt, inspection and conditional stock admission in Zeebe. P1 has a DCR compliance graph, an XES execution log and local conformance checks. The remaining transport workflow, P4–P6, Siddhi processing and external API adapters are under development; P1 course-tool compliance checking has passed.
 
 ## Architecture
 
@@ -37,7 +37,7 @@ The planned architecture connects simulated telemetry and external weather/traff
 
 The current implementation contains:
 
-- **Camunda Zeebe 8.8** — execution of shipment preparation and the initial transport handoff.
+- **Camunda Zeebe 8.8** — execution of shipment preparation, transport handoff and receiving/admission.
 - **Python 3.12** — HTTP endpoints and Zeebe job workers, using Flask and pyzeebe.
 - **SQLite** — persistent shipment registry, reservations and activity journal.
 - **Elasticsearch and Camunda Operate** — exported engine records and process inspection.

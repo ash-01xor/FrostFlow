@@ -88,6 +88,44 @@ def shipment(shipment_id):
 def events(shipment_id):
     return jsonify(registry.events(shipment_id))
 
+
+@app.post("/shipments/<shipment_id>/receiving")
+def start_receiving(shipment_id):
+    data = body()
+    receiver = text_field(data, "receiver")
+    inspector = text_field(data, "inspector")
+    passed = data.get("passed")
+    if not isinstance(passed, bool):
+        raise ValueError("passed must be a JSON boolean")
+    if not ready.is_set():
+        return jsonify(error="wait for /health to report ready"), 503
+
+    registry.begin_receiving(shipment_id)
+    try:
+        result = engine_call(
+            client.run_process(
+                "StockReceiving",
+                variables={
+                    "shipmentId": shipment_id,
+                    "receiver": receiver,
+                    "inspector": inspector,
+                    "passed": passed,
+                },
+            )
+        )
+        record = registry.attach_receiving_key(
+            shipment_id, result.process_instance_key
+        )
+    except Exception:
+        registry.mark_receiving_uncertain(shipment_id)
+        app.logger.exception("P3 engine start outcome uncertain")
+        return jsonify(
+            error="P3 start outcome uncertain; inspect logs and Operate before recovery",
+            shipmentId=shipment_id,
+        ), 502
+    return jsonify(record), 202
+
+
 @app.post("/shipments/<shipment_id>/receive")
 def receive(shipment_id):
     data = body()

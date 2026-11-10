@@ -54,13 +54,18 @@ class Preparation(unittest.TestCase):
         self.addCleanup(service.ready.clear)
 
         class Engine:
+            def __init__(inner):
+                inner.calls = []
+
             def run_process(inner, *args, **kwargs):
+                inner.calls.append((args, kwargs))
                 return CreateProcessInstanceResponse(
                     1, service.PROCESS_ID, 1, self.key, "<default>"
                 )
 
+        self.engine = Engine()
         for target, replacement in [
-            ("client", Engine()),
+            ("client", self.engine),
             ("engine_call", lambda value: value),
         ]:
             patcher = patch.object(service, target, replacement)
@@ -380,6 +385,96 @@ class Preparation(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.get_json()["admissionStatus"], "ADMITTED")
         self.assertEqual(self.available(), initial_stock + 3)
+
+    def test_receiving_endpoint_starts_p3_and_records_its_key(self):
+        self.create(quantity=3)
+
+        response = self.http.post(
+            "/shipments/S-test/receiving",
+            json={
+                "receiver": "warehouse-operator",
+                "inspector": "quality-inspector",
+                "passed": True,
+            },
+        )
+
+        self.assertEqual(response.status_code, 202)
+        self.assertEqual(response.get_json()["p3ProcessInstanceKey"], str(self.key))
+        self.assertEqual(
+            self.engine.calls[-1],
+            (
+                ("StockReceiving",),
+                {
+                    "variables": {
+                        "shipmentId": "S-test",
+                        "receiver": "warehouse-operator",
+                        "inspector": "quality-inspector",
+                        "passed": True,
+                    }
+                },
+            ),
+        )
+        self.assertEqual(self.db.get("S-test")["p3StartStatus"], "STARTED")
+
+    def test_receiving_endpoint_rejects_duplicate_p3_start(self):
+        self.create(quantity=3)
+        data = {
+            "receiver": "warehouse-operator",
+            "inspector": "quality-inspector",
+            "passed": True,
+        }
+
+        self.assertEqual(
+            self.http.post("/shipments/S-test/receiving", json=data).status_code,
+            202,
+        )
+        response = self.http.post("/shipments/S-test/receiving", json=data)
+
+        self.assertEqual(response.status_code, 409)
+        self.assertEqual(len(self.engine.calls), 2)
+
+    def test_receiving_endpoint_requires_boolean_inspection_result(self):
+        self.create(quantity=3)
+
+        response = self.http.post(
+            "/shipments/S-test/receiving",
+            json={
+                "receiver": "warehouse-operator",
+                "inspector": "quality-inspector",
+                "passed": "true",
+            },
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(len(self.engine.calls), 1)
+
+    def test_receiving_endpoint_marks_failed_engine_start_uncertain(self):
+        self.create(quantity=3)
+        with patch.object(
+            self.engine, "run_process", side_effect=RuntimeError("engine unavailable")
+        ):
+            response = self.http.post(
+                "/shipments/S-test/receiving",
+                json={
+                    "receiver": "warehouse-operator",
+                    "inspector": "quality-inspector",
+                    "passed": True,
+                },
+            )
+
+        self.assertEqual(response.status_code, 502)
+        self.assertEqual(self.db.get("S-test")["p3StartStatus"], "UNCERTAIN")
+        self.assertEqual(
+            self.http.post(
+                "/shipments/S-test/receiving",
+                json={
+                    "receiver": "warehouse-operator",
+                    "inspector": "quality-inspector",
+                    "passed": True,
+                },
+            ).status_code,
+            409,
+        )
 
     def test_inspect_endpoint_rejects_non_boolean_passed(self):
         self.create(quantity=3)
@@ -925,6 +1020,31 @@ class Preparation(unittest.TestCase):
         self.assertEqual(record["productId"], "PRD-004")
         self.assertEqual(record["batchId"], "DEMO-CHICKEN-001")
         self.assertEqual(record["quantity"], 15)
+
+    def test_demo_menu_starts_p3_for_existing_shipment(self):
+        from tools import demo
+
+        self.create(shipment="demo-A", quantity=3)
+
+        def local_http(base, path, data=None):
+            response = (
+                self.http.get(path) if data is None else self.http.post(path, json=data)
+            )
+            return response.status_code, response.json
+
+        with (
+            patch.object(demo, "http", side_effect=local_http),
+            patch.object(demo, "wait_for_action"),
+            patch("builtins.input", side_effect=["A", "n"]),
+            patch("builtins.print"),
+        ):
+            demo.perform("http://example.test", "9")
+
+        self.assertEqual(
+            self.db.get("demo-A")["p3ProcessInstanceKey"], str(self.key)
+        )
+        self.assertEqual(self.engine.calls[-1][0], ("StockReceiving",))
+        self.assertFalse(self.engine.calls[-1][1]["variables"]["passed"])
 
 
 class Compliance(unittest.TestCase):

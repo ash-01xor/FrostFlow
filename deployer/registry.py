@@ -282,6 +282,33 @@ class Registry:
             self.save(db, record)
             return record 
 
+    def begin_receiving(self, shipment_id):
+        with self.transaction() as db:
+            record = self.read(db, shipment_id)
+            if record.get("p3ProcessInstanceKey") or record.get("p3StartStatus"):
+                raise Conflict("P3 has already been started or its start is uncertain")
+            record["p3StartStatus"] = "STARTING"
+            self.save(db, record)
+            return record
+
+    def attach_receiving_key(self, shipment_id, key):
+        with self.transaction() as db:
+            record = self.read(db, shipment_id)
+            if record.get("p3ProcessInstanceKey") not in (None, str(key)):
+                raise Conflict("shipment belongs to a different P3 engine instance")
+            record["p3ProcessInstanceKey"] = str(key)
+            record["p3StartStatus"] = "STARTED"
+            self.save(db, record)
+            self.event(db, record, "ReceivingStarted", process="P3")
+            return record
+
+    def mark_receiving_uncertain(self, shipment_id):
+        with self.transaction() as db:
+            record = self.read(db, shipment_id)
+            if not record.get("p3ProcessInstanceKey"):
+                record["p3StartStatus"] = "UNCERTAIN"
+                self.save(db, record)
+
     def record_inspection(self, shipment_id, inspector, passed):
         with self.transaction() as db:
             record = self.read(db, shipment_id)
