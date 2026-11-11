@@ -169,42 +169,42 @@ P1 reaches `DISPATCHED`. Poll until `handoffStatus` is `ACKNOWLEDGED`: the recor
 For a manual P2 run, the menu above polls after arrival and receipt. The equivalent API inputs are below. First, an early receipt must be rejected with HTTP **409** while transport is `IN_TRANSIT`:
 
 ```bash
-curl -s -i -X POST http://localhost:5001/shipments/S-001/acknowledge-receipt \
+curl -s -i -X POST http://localhost:5001/shipments/S-003/acknowledge-receipt \
   -H 'Content-Type: application/json' \
-  -d '{"eventId":"receipt-S-001-001","occurredAt":"2026-11-15T10:24:00Z","recipientId":"C-01","quantityReceived":15,"receiptReference":"RCPT-001"}'
+  -d '{"eventId":"receipt-S-003-001","occurredAt":"2026-11-15T10:24:00Z","recipientId":"C-02","quantityReceived":10,"receiptReference":"RCPT-003"}'
 ```
 
-After arrival is accepted with HTTP **202**, poll `GET /shipments/S-001` until `transportState` is `ARRIVED` and `vehicleReleased` is `false`. In Windows PowerShell:
+Expect HTTP **409** because the shipment is still `IN_TRANSIT`. Now submit arrival for S-003; expect **202**:
+
+```bash
+curl -s -i -X POST http://localhost:5001/shipments/S-003/arrive \
+  -H 'Content-Type: application/json' \
+  -d '{"eventId":"arr-S-003-001","occurredAt":"2026-11-15T10:22:00Z","recipientId":"C-02"}'
+```
+
+After arrival is accepted, poll `GET /shipments/S-003` until `transportState` is `ARRIVED` and `vehicleReleased` is `false`. In Windows PowerShell:
 
 ```powershell
 do {
-  $record = Invoke-RestMethod http://localhost:5001/shipments/S-001
+  $record = Invoke-RestMethod http://localhost:5001/shipments/S-003
   if ($record.transportState -ne "ARRIVED") { Start-Sleep -Seconds 1 }
 } while ($record.transportState -ne "ARRIVED")
 $record | Format-List shipmentId,transportState,vehicleReleased
 ```
 
-In Operate, the P2 instance passes the `WaitForShipmentArrived` message catch and activates `WaitForReceiptAcknowledged`; it cannot reach the `TransportCompleted` end event yet.
+In Operate, P2 passes `WaitForShipmentArrived` and waits at `WaitForReceiptAcknowledged`. It cannot complete yet. Submit the same receipt payload again after arrival; expect **202**:
 
 ```bash
-curl -s -i -X POST http://localhost:5001/shipments/S-001/arrive \
+curl -s -i -X POST http://localhost:5001/shipments/S-003/acknowledge-receipt \
   -H 'Content-Type: application/json' \
-  -d '{"eventId":"arr-S-001-001","occurredAt":"2026-11-15T10:22:00Z","recipientId":"C-01"}'
-```
-
-Submit the same receipt payload after arrival; expect **202**:
-
-```bash
-curl -s -i -X POST http://localhost:5001/shipments/S-001/acknowledge-receipt \
-  -H 'Content-Type: application/json' \
-  -d '{"eventId":"receipt-S-001-001","occurredAt":"2026-11-15T10:24:00Z","recipientId":"C-01","quantityReceived":15,"receiptReference":"RCPT-001"}'
+  -d '{"eventId":"receipt-S-003-001","occurredAt":"2026-11-15T10:24:00Z","recipientId":"C-02","quantityReceived":10,"receiptReference":"RCPT-003"}'
 ```
 
 Then poll until `transportState` is `COMPLETED` and `vehicleReleased` is `true`:
 
 ```powershell
 do {
-  $record = Invoke-RestMethod http://localhost:5001/shipments/S-001
+  $record = Invoke-RestMethod http://localhost:5001/shipments/S-003
   if ($record.transportState -ne "COMPLETED" -or -not $record.vehicleReleased) {
     Start-Sleep -Seconds 1
   }
@@ -315,7 +315,7 @@ npx --yes @camunda8/cli@4.6.1 bpmn lint bpmn/shipment_preparation.bpmn
 npx --yes @camunda8/cli@4.6.1 bpmn lint bpmn/transport.bpmn
 ```
 
-The offline suite contains **32 tests** covering five-product seed data, product/batch validation, isolated inventory, concurrent reservation, targeted supply, restart persistence, legacy-data protection, XES traceability, retry identities, cancellation, outbox handling, P2 state guards, CLI event routing and DCR replay. They stub engine calls; they do not replace the live P2 completion check below.
+The offline suite contains **33 tests** covering five-product seed data, product/batch validation, isolated inventory, concurrent reservation, targeted supply, restart persistence, legacy-data protection, XES traceability, retry identities, cancellation, outbox handling, P2 state guards, CLI event routing, legacy P2 upgrade repair and DCR replay. They stub engine calls; they do not replace the live P2 completion check below.
 
 Against a fresh, healthy stack:
 

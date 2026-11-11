@@ -194,22 +194,23 @@ class Registry:
             "SELECT data FROM events WHERE id=?", (producer_event_id,)
         ).fetchone()
         if legacy is None:
-            return
+            return False
         event = json.loads(legacy[0])
         if event.get("shipmentId") != shipment_id or event.get("eventType") != event_type:
-            return
+            return False
         journal_id = cls.transport_event_journal_id(
             shipment_id, event_type, producer_event_id
         )
         if db.execute("SELECT 1 FROM events WHERE id=?", (journal_id,)).fetchone():
             db.execute("DELETE FROM events WHERE id=?", (producer_event_id,))
-            return
+            return True
         event["eventId"] = journal_id
         event["producerEventId"] = producer_event_id
         db.execute(
             "UPDATE events SET id=?, data=? WHERE id=?",
             (journal_id, json.dumps(event), producer_event_id),
         )
+        return True
 
     @staticmethod
     def enqueue(db, message_id, name, correlation, variables, needs_ack=False):
@@ -778,7 +779,7 @@ class Registry:
             receipt_journal_id = self.transport_event_journal_id(
                 shipment_id, "ReceiptAcknowledged", accepted["eventId"]
             )
-            self.migrate_legacy_transport_event(
+            migrated_legacy_receipt = self.migrate_legacy_transport_event(
                 db, shipment_id, "ReceiptAcknowledged", accepted["eventId"]
             )
             if record.get("vehicleReleased"):
@@ -787,7 +788,29 @@ class Registry:
                     (f"P2:{shipment_id}:VehicleReleased",),
                 ).fetchone()
                 if vehicle_event is None:
-                    raise Conflict("vehicle release state has no recorded activity")
+                    receipt_row = db.execute(
+                        "SELECT data FROM events WHERE id=?", (receipt_journal_id,)
+                    ).fetchone()
+                    legacy_receipt = (
+                        json.loads(receipt_row[0]) if receipt_row is not None else {}
+                    )
+                    verified_legacy_collision = (
+                        migrated_legacy_receipt
+                        and record.get("transportState") == "COMPLETED"
+                        and legacy_receipt.get("eventType") == "ReceiptAcknowledged"
+                        and legacy_receipt.get("shipmentId") == shipment_id
+                        and legacy_receipt.get("producerEventId") == accepted["eventId"]
+                        and all(
+                            legacy_receipt.get("payload", {}).get(field) == value
+                            for field, value in accepted["payload"].items()
+                        )
+                        and legacy_receipt.get("occurredAt") == accepted["occurredAt"]
+                    )
+                    if not verified_legacy_collision:
+                        raise Conflict("vehicle release state has no recorded activity")
+                    self.event(db, record, "VehicleReleased", process="P2")
+                    self.save(db, record)
+                    return record
                 if json.loads(vehicle_event[0]).get("eventType") != "VehicleReleased":
                     self.migrate_legacy_transport_event(
                         db,

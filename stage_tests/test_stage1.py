@@ -538,6 +538,83 @@ class Preparation(unittest.TestCase):
         )
         self.assertFalse(self.db.get("S-test")["vehicleReleased"])
 
+    def test_upgrade_repairs_legacy_receipt_vehicle_release_collision(self):
+        self.loading_wait()
+        self.verify()
+        self.db.advance(
+            "S-test", self.key, "AWAITING_LOADING", "AWAITING_DISPATCH", "LoadingVerified"
+        )
+        self.db.reserve_command("S-test", "DispatchApproved", "dispatcher")
+        self.db.advance(
+            "S-test", self.key, "AWAITING_DISPATCH", "DISPATCHED", "ShipmentDispatched"
+        )
+        dispatch = next(
+            event
+            for event in self.db.events("S-test")
+            if event["eventType"] == "ShipmentDispatched"
+        )
+        self.db.start_transport("S-test", 999, dispatch)
+        self.db.start_journey("S-test", 999)
+        arrival = {
+            "eventId": "arrival-upgrade",
+            "occurredAt": "2026-12-01T10:22:00Z",
+            "recipientId": "C-01",
+        }
+        self.assertEqual(self.http.post("/shipments/S-test/arrive", json=arrival).status_code, 202)
+        arrival_event = next(
+            message["variables"]["arrivalEvent"]
+            for message in self.db.pending_messages()
+            if message["name"] == "ShipmentArrived"
+        )
+        self.db.record_arrival("S-test", 999, arrival_event)
+
+        receipt = {
+            "eventId": "P2:S-test:VehicleReleased",
+            "occurredAt": "2026-12-01T10:24:00Z",
+            "recipientId": "C-01",
+            "quantityReceived": 3,
+        }
+        self.assertEqual(
+            self.http.post("/shipments/S-test/acknowledge-receipt", json=receipt).status_code,
+            202,
+        )
+        receipt_event = next(
+            message["variables"]["receiptEvent"]
+            for message in self.db.pending_messages()
+            if message["name"] == "ReceiptAcknowledged"
+        )
+
+        # Simulate the previous version: receipt activity occupied the internal
+        # VehicleReleased ID, while the completed state was already persisted.
+        with self.db.transaction() as db:
+            record = self.db.read(db, "S-test")
+            record.update(transportState="COMPLETED", vehicleReleased=True)
+            self.db.event(
+                db,
+                record,
+                "ReceiptAcknowledged",
+                actor=receipt_event["source"],
+                process="P2",
+                event_id=receipt_event["eventId"],
+                payload=receipt_event["payload"],
+                occurred_at=receipt_event["occurredAt"],
+                recorded_at=receipt_event["recordedAt"],
+                source=receipt_event["source"],
+                input_mode=receipt_event["inputMode"],
+            )
+            self.db.save(db, record)
+
+        for _ in range(2):
+            record = self.db.release_vehicle("S-test", 999, receipt_event)
+            self.assertEqual(record["transportState"], "COMPLETED")
+            self.assertTrue(record["vehicleReleased"])
+        events = self.db.events("S-test")
+        receipt_activities = [e for e in events if e["eventType"] == "ReceiptAcknowledged"]
+        release_activities = [e for e in events if e["eventType"] == "VehicleReleased"]
+        self.assertEqual(len(receipt_activities), 1)
+        self.assertEqual(len(release_activities), 1)
+        self.assertEqual(receipt_activities[0]["producerEventId"], receipt["eventId"])
+
     def test_invalid_input(self):
         for change in (
             {"quantity": True},
