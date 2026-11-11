@@ -45,7 +45,15 @@ def http(base, path, data=None):
     except HTTPError as error:
         response = error
     with response:
-        return response.status, json.load(response)
+        body = response.read()
+        try:
+            payload = json.loads(body) if body else {}
+        except json.JSONDecodeError:
+            payload = {
+                "error": body.decode("utf-8", errors="replace").strip()
+                or f"HTTP {response.status} returned no JSON response"
+            }
+        return response.status, payload
 
 
 def show(record):
@@ -239,6 +247,7 @@ def perform(base, choice):
             print(
                 f"Recording 5 crates of {record['productName']} for batch {record['batchId']}."
             )
+    if choice != "1":
         path += "/" + action
     status, response = http(base, path, data)
     if status != 202:

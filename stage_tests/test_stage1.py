@@ -823,6 +823,44 @@ class Preparation(unittest.TestCase):
         self.assertEqual(record["batchId"], "DEMO-CHICKEN-001")
         self.assertEqual(record["quantity"], 15)
 
+    def test_demo_manual_actions_post_to_the_event_endpoints(self):
+        from tools import demo
+
+        self.create(shipment="demo-A", vehicle="V-01", quantity=15)
+        shipment = self.db.get("demo-A")
+        calls = []
+
+        def local_http(base, path, data=None):
+            calls.append((path, data))
+            if path == "/shipments/demo-A":
+                return 200, shipment
+            if path == "/shipments/demo-A/events":
+                return 200, [
+                    {
+                        "eventType": "ShipmentCreated",
+                        "occurredAt": "2026-11-11T10:00:00Z",
+                    }
+                ]
+            return 202, {"accepted": True}
+
+        with (
+            patch.object(demo, "http", side_effect=local_http),
+            patch.object(demo, "wait_for_action"),
+            patch("builtins.input", return_value="A"),
+            patch("builtins.print"),
+        ):
+            demo.perform("http://example.test", "9")
+            demo.perform("http://example.test", "10")
+
+        posted_paths = [path for path, data in calls if data is not None]
+        self.assertEqual(
+            posted_paths,
+            [
+                "/shipments/demo-A/arrive",
+                "/shipments/demo-A/acknowledge-receipt",
+            ],
+        )
+
 
 class Compliance(unittest.TestCase):
     def test_portal_xml_has_required_editor_metadata(self):

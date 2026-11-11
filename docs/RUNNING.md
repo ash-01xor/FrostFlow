@@ -315,7 +315,7 @@ npx --yes @camunda8/cli@4.6.1 bpmn lint bpmn/shipment_preparation.bpmn
 npx --yes @camunda8/cli@4.6.1 bpmn lint bpmn/transport.bpmn
 ```
 
-The offline suite contains **31 tests** covering five-product seed data, product/batch validation, isolated inventory, concurrent reservation, targeted supply, restart persistence, legacy-data protection, XES traceability, retry identities, cancellation, outbox handling, P2 state guards and DCR replay. They stub engine calls; they do not replace the live P2 completion check below.
+The offline suite contains **32 tests** covering five-product seed data, product/batch validation, isolated inventory, concurrent reservation, targeted supply, restart persistence, legacy-data protection, XES traceability, retry identities, cancellation, outbox handling, P2 state guards, CLI event routing and DCR replay. They stub engine calls; they do not replace the live P2 completion check below.
 
 Against a fresh, healthy stack:
 
