@@ -12,21 +12,55 @@
       <bpmn:incoming>Flow_1</bpmn:incoming>
       <bpmn:outgoing>Flow_2</bpmn:outgoing>
     </bpmn:serviceTask>
-    <bpmn:intermediateCatchEvent id="WaitForTransportImplementation" name="Await transport workflow">
+    <bpmn:serviceTask id="StartJourney" name="Start journey">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="p2-start-journey" retries="3" />
+      </bpmn:extensionElements>
       <bpmn:incoming>Flow_2</bpmn:incoming>
       <bpmn:outgoing>Flow_3</bpmn:outgoing>
-      <bpmn:messageEventDefinition id="WaitForTransportImplementationDefinition" messageRef="Message_TransportContinuation" />
-    </bpmn:intermediateCatchEvent>
-    <bpmn:endEvent id="TransportCompleted" name="Transport completed">
+    </bpmn:serviceTask>
+    <bpmn:intermediateCatchEvent id="WaitForShipmentArrived" name="Wait for shipment arrival">
       <bpmn:incoming>Flow_3</bpmn:incoming>
+      <bpmn:outgoing>Flow_4</bpmn:outgoing>
+      <bpmn:messageEventDefinition id="WaitForShipmentArrivedDefinition" messageRef="Message_ShipmentArrived" />
+    </bpmn:intermediateCatchEvent>
+    <bpmn:serviceTask id="RecordArrival" name="Record arrival">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="p2-record-arrival" retries="3" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_4</bpmn:incoming>
+      <bpmn:outgoing>Flow_5</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:intermediateCatchEvent id="WaitForReceiptAcknowledged" name="Wait for receipt acknowledgement">
+      <bpmn:incoming>Flow_5</bpmn:incoming>
+      <bpmn:outgoing>Flow_6</bpmn:outgoing>
+      <bpmn:messageEventDefinition id="WaitForReceiptAcknowledgedDefinition" messageRef="Message_ReceiptAcknowledged" />
+    </bpmn:intermediateCatchEvent>
+    <bpmn:serviceTask id="ReleaseVehicle" name="Release vehicle">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="p2-release-vehicle" retries="3" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_6</bpmn:incoming>
+      <bpmn:outgoing>Flow_7</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:endEvent id="TransportCompleted" name="Transport completed">
+      <bpmn:incoming>Flow_7</bpmn:incoming>
     </bpmn:endEvent>
     <bpmn:sequenceFlow id="Flow_1" sourceRef="DispatchReceived" targetRef="StartTransport" />
-    <bpmn:sequenceFlow id="Flow_2" sourceRef="StartTransport" targetRef="WaitForTransportImplementation" />
-    <bpmn:sequenceFlow id="Flow_3" sourceRef="WaitForTransportImplementation" targetRef="TransportCompleted" />
+    <bpmn:sequenceFlow id="Flow_2" sourceRef="StartTransport" targetRef="StartJourney" />
+    <bpmn:sequenceFlow id="Flow_3" sourceRef="StartJourney" targetRef="WaitForShipmentArrived" />
+    <bpmn:sequenceFlow id="Flow_4" sourceRef="WaitForShipmentArrived" targetRef="RecordArrival" />
+    <bpmn:sequenceFlow id="Flow_5" sourceRef="RecordArrival" targetRef="WaitForReceiptAcknowledged" />
+    <bpmn:sequenceFlow id="Flow_6" sourceRef="WaitForReceiptAcknowledged" targetRef="ReleaseVehicle" />
+    <bpmn:sequenceFlow id="Flow_7" sourceRef="ReleaseVehicle" targetRef="TransportCompleted" />
   </bpmn:process>
-  <bpmn:message id="Message_ShipmentDispatched" name="ShipmentDispatched">
+  <bpmn:message id="Message_ShipmentDispatched" name="ShipmentDispatched" />
+  <bpmn:message id="Message_ShipmentArrived" name="ShipmentArrived">
+    <bpmn:extensionElements>
+      <zeebe:subscription correlationKey="=shipmentId" />
+    </bpmn:extensionElements>
   </bpmn:message>
-  <bpmn:message id="Message_TransportContinuation" name="TransportContinuation">
+  <bpmn:message id="Message_ReceiptAcknowledged" name="ReceiptAcknowledged">
     <bpmn:extensionElements>
       <zeebe:subscription correlationKey="=shipmentId" />
     </bpmn:extensionElements>
@@ -34,38 +68,72 @@
   <bpmndi:BPMNDiagram id="Diagram">
     <bpmndi:BPMNPlane id="Plane" bpmnElement="ShipmentTransport">
       <bpmndi:BPMNShape id="DispatchReceived_di" bpmnElement="DispatchReceived">
-        <dc:Bounds x="160" y="102" width="36" height="36" />
+        <dc:Bounds x="120" y="132" width="36" height="36" />
         <bpmndi:BPMNLabel>
-          <dc:Bounds x="133" y="143" width="100" height="40" />
+          <dc:Bounds x="92" y="173" width="100" height="40" />
         </bpmndi:BPMNLabel>
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="StartTransport_di" bpmnElement="StartTransport">
-        <dc:Bounds x="340" y="80" width="100" height="80" />
+        <dc:Bounds x="220" y="110" width="100" height="80" />
         <bpmndi:BPMNLabel />
       </bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="WaitForTransportImplementation_di" bpmnElement="WaitForTransportImplementation">
-        <dc:Bounds x="520" y="102" width="36" height="36" />
+      <bpmndi:BPMNShape id="StartJourney_di" bpmnElement="StartJourney">
+        <dc:Bounds x="400" y="110" width="100" height="80" />
+        <bpmndi:BPMNLabel />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="WaitForShipmentArrived_di" bpmnElement="WaitForShipmentArrived">
+        <dc:Bounds x="580" y="132" width="36" height="36" />
         <bpmndi:BPMNLabel>
-          <dc:Bounds x="493" y="143" width="100" height="40" />
+          <dc:Bounds x="548" y="173" width="104" height="40" />
         </bpmndi:BPMNLabel>
       </bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="TransportCompleted_di" bpmnElement="TransportCompleted">
-        <dc:Bounds x="700" y="102" width="36" height="36" />
+      <bpmndi:BPMNShape id="RecordArrival_di" bpmnElement="RecordArrival">
+        <dc:Bounds x="690" y="110" width="100" height="80" />
+        <bpmndi:BPMNLabel />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="WaitForReceiptAcknowledged_di" bpmnElement="WaitForReceiptAcknowledged">
+        <dc:Bounds x="870" y="132" width="36" height="36" />
         <bpmndi:BPMNLabel>
-          <dc:Bounds x="673" y="143" width="100" height="40" />
+          <dc:Bounds x="836" y="173" width="112" height="40" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="ReleaseVehicle_di" bpmnElement="ReleaseVehicle">
+        <dc:Bounds x="980" y="110" width="100" height="80" />
+        <bpmndi:BPMNLabel />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="TransportCompleted_di" bpmnElement="TransportCompleted">
+        <dc:Bounds x="1160" y="132" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1132" y="173" width="100" height="40" />
         </bpmndi:BPMNLabel>
       </bpmndi:BPMNShape>
       <bpmndi:BPMNEdge id="Flow_1_di" bpmnElement="Flow_1">
-        <di:waypoint x="196" y="120" />
-        <di:waypoint x="340" y="120" />
+        <di:waypoint x="156" y="150" />
+        <di:waypoint x="220" y="150" />
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="Flow_2_di" bpmnElement="Flow_2">
-        <di:waypoint x="440" y="120" />
-        <di:waypoint x="520" y="120" />
+        <di:waypoint x="320" y="150" />
+        <di:waypoint x="400" y="150" />
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="Flow_3_di" bpmnElement="Flow_3">
-        <di:waypoint x="556" y="120" />
-        <di:waypoint x="700" y="120" />
+        <di:waypoint x="500" y="150" />
+        <di:waypoint x="580" y="150" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_4_di" bpmnElement="Flow_4">
+        <di:waypoint x="616" y="150" />
+        <di:waypoint x="690" y="150" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_5_di" bpmnElement="Flow_5">
+        <di:waypoint x="790" y="150" />
+        <di:waypoint x="870" y="150" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_6_di" bpmnElement="Flow_6">
+        <di:waypoint x="906" y="150" />
+        <di:waypoint x="980" y="150" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_7_di" bpmnElement="Flow_7">
+        <di:waypoint x="1080" y="150" />
+        <di:waypoint x="1160" y="150" />
       </bpmndi:BPMNEdge>
     </bpmndi:BPMNPlane>
   </bpmndi:BPMNDiagram>

@@ -1,10 +1,11 @@
-"""Shipment preparation and the initial transport handoff."""
+"""Shipment preparation and the manual-input P2 transport workflow."""
 
 import asyncio
+import math
 import os
 import re
 import threading
-from datetime import datetime
+from datetime import datetime, timezone
 
 import grpc
 from flask import Flask, jsonify, request
@@ -22,6 +23,9 @@ JOB_TYPES = [
     "p1-dispatch",
     "p1-cancel",
     "p2-start-transport",
+    "p2-start-journey",
+    "p2-record-arrival",
+    "p2-release-vehicle",
 ]
 app = Flask(__name__)
 registry = Registry(os.getenv("REGISTRY_PATH", "runtime/registry.sqlite"))
@@ -44,6 +48,33 @@ def text_field(data, field):
             f"{field} must be a non-empty string of at most 100 characters"
         )
     return value.strip()
+
+
+def utc_timestamp(data, field):
+    value = text_field(data, field)
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError as error:
+        raise ValueError(f"{field} must be an ISO 8601 UTC timestamp") from error
+    if parsed.utcoffset() is None or parsed.utcoffset().total_seconds() != 0:
+        raise ValueError(f"{field} must include UTC timezone Z or +00:00")
+    return parsed.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
+
+
+def manual_event_payload(data, shipment_id, event_type):
+    record = registry.get(shipment_id)
+    if "eventType" in data and data["eventType"] != event_type:
+        raise ValueError(f"eventType must be {event_type}")
+    if "shipmentId" in data and data["shipmentId"] != shipment_id:
+        raise Conflict("shipmentId must match the URL")
+    if "journeyId" in data and data["journeyId"] != record["journeyId"]:
+        raise Conflict("journeyId must match the dispatched shipment")
+    if "inputMode" in data and data["inputMode"] != "manual":
+        raise ValueError("these endpoints accept manual input only")
+    payload = data.get("payload", data)
+    if not isinstance(payload, dict):
+        raise ValueError("payload must be a JSON object")
+    return payload
 
 
 def engine_call(coro):
@@ -215,6 +246,90 @@ def dispatch(shipment_id):
     return send_action(shipment_id, "DispatchApproved", text_field(body(), "actor"))
 
 
+@app.post("/shipments/<shipment_id>/arrive")
+def manual_arrival(shipment_id):
+    """Manual/test input for ShipmentArrived until the P2 simulator is connected."""
+    data = body()
+    event_id = text_field(data, "eventId")
+    occurred_at = utc_timestamp(data, "occurredAt")
+    input_payload = manual_event_payload(data, shipment_id, "ShipmentArrived")
+    payload = {"recipientId": text_field(input_payload, "recipientId")}
+    has_latitude = "latitude" in input_payload
+    has_longitude = "longitude" in input_payload
+    if has_latitude != has_longitude:
+        raise ValueError("latitude and longitude must be supplied together")
+    if has_latitude:
+        latitude, longitude = input_payload["latitude"], input_payload["longitude"]
+        if (
+            type(latitude) not in (int, float)
+            or type(longitude) not in (int, float)
+            or not -90 <= latitude <= 90
+            or not -180 <= longitude <= 180
+            or not math.isfinite(latitude)
+            or not math.isfinite(longitude)
+        ):
+            raise ValueError("latitude/longitude must be valid coordinate numbers")
+        payload.update(latitude=latitude, longitude=longitude)
+    if not ready.is_set():
+        return jsonify(error="worker service is not ready"), 503
+    accepted = registry.queue_transport_event(
+        shipment_id,
+        "ShipmentArrived",
+        event_id,
+        occurred_at,
+        payload,
+        source="p2-manual-test",
+    )
+    return jsonify(
+        status="accepted",
+        inputMode="manual",
+        shipmentId=shipment_id,
+        eventId=event_id,
+        messageId=accepted["messageId"],
+    ), 202
+
+
+@app.post("/shipments/<shipment_id>/acknowledge-receipt")
+def manual_receipt_acknowledgement(shipment_id):
+    """Manual/test P2 input for the receipt acknowledgement normally sent by P3."""
+    data = body()
+    event_id = text_field(data, "eventId")
+    occurred_at = utc_timestamp(data, "occurredAt")
+    input_payload = manual_event_payload(
+        data, shipment_id, "ReceiptAcknowledged"
+    )
+    payload = {
+        "recipientId": text_field(input_payload, "recipientId"),
+        "quantityReceived": input_payload.get("quantityReceived"),
+    }
+    if (
+        type(payload["quantityReceived"]) is not int
+        or payload["quantityReceived"] < 1
+    ):
+        raise ValueError(
+            "quantityReceived must be a positive integer number of crates"
+        )
+    if "receiptReference" in input_payload:
+        payload["receiptReference"] = text_field(input_payload, "receiptReference")
+    if not ready.is_set():
+        return jsonify(error="worker service is not ready"), 503
+    accepted = registry.queue_transport_event(
+        shipment_id,
+        "ReceiptAcknowledged",
+        event_id,
+        occurred_at,
+        payload,
+        source="p3-manual-test",
+    )
+    return jsonify(
+        status="accepted",
+        inputMode="manual",
+        shipmentId=shipment_id,
+        eventId=event_id,
+        messageId=accepted["messageId"],
+    ), 202
+
+
 async def check_stock(shipmentId, job: Job):
     return registry.check_stock(shipmentId, job.process_instance_key, job.key)
 
@@ -278,6 +393,21 @@ async def start_transport(shipmentId, dispatchEvent, job: Job):
     return registry.start_transport(shipmentId, job.process_instance_key, dispatchEvent)
 
 
+async def start_journey(shipmentId, job: Job):
+    registry.start_journey(shipmentId, job.process_instance_key)
+    return {}
+
+
+async def record_arrival(shipmentId, arrivalEvent, job: Job):
+    registry.record_arrival(shipmentId, job.process_instance_key, arrivalEvent)
+    return {}
+
+
+async def release_vehicle(shipmentId, receiptEvent, job: Job):
+    registry.release_vehicle(shipmentId, job.process_instance_key, receiptEvent)
+    return {}
+
+
 async def deliver_messages():
     """Retry unsent durable commands; successful dispatch is acknowledged by P2's worker."""
     while True:
@@ -311,23 +441,25 @@ async def main():
     channel = grpc.aio.insecure_channel(os.getenv("ZEEBE_ADDRESS", "localhost:26501"))
     client = ZeebeClient(grpc_channel=channel)
     worker = ZeebeWorker(grpc_channel=channel)
-    for job_type, handler in zip(
-        JOB_TYPES,
-        (
-            check_stock,
-            allocate_stock,
-            assign_transport,
-            record_loading,
-            dispatch_shipment,
-            cancel_shipment,
-            start_transport,
-        ),
-    ):
-        variables = (
-            ["shipmentId", "dispatchEvent"]
-            if job_type == "p2-start-transport"
-            else ["shipmentId"]
-        )
+    handlers = (
+        check_stock,
+        allocate_stock,
+        assign_transport,
+        record_loading,
+        dispatch_shipment,
+        cancel_shipment,
+        start_transport,
+        start_journey,
+        record_arrival,
+        release_vehicle,
+    )
+    variables_by_job = {
+        "p2-start-transport": ["shipmentId", "dispatchEvent"],
+        "p2-record-arrival": ["shipmentId", "arrivalEvent"],
+        "p2-release-vehicle": ["shipmentId", "receiptEvent"],
+    }
+    for job_type, handler in zip(JOB_TYPES, handlers):
+        variables = variables_by_job.get(job_type, ["shipmentId"])
         worker.task(task_type=job_type, variables_to_fetch=variables)(handler)
     threading.Thread(
         target=lambda: app.run(host="0.0.0.0", port=5001, threaded=True), daemon=True

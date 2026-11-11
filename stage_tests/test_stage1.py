@@ -353,6 +353,268 @@ class Preparation(unittest.TestCase):
             1,
         )
 
+    def test_p2_manual_arrival_and_receipt_gate_vehicle_release(self):
+        self.loading_wait()
+        self.verify()
+        self.db.advance(
+            "S-test",
+            self.key,
+            "AWAITING_LOADING",
+            "AWAITING_DISPATCH",
+            "LoadingVerified",
+        )
+        self.db.reserve_command("S-test", "DispatchApproved", "dispatcher")
+        self.db.advance(
+            "S-test", self.key, "AWAITING_DISPATCH", "DISPATCHED", "ShipmentDispatched"
+        )
+        dispatch_event = next(
+            event
+            for event in self.db.events("S-test")
+            if event["eventType"] == "ShipmentDispatched"
+        )
+        self.db.start_transport("S-test", 999, dispatch_event)
+        self.db.start_journey("S-test", 999)
+        self.assertEqual(self.db.get("S-test")["transportState"], "IN_TRANSIT")
+        self.assertFalse(self.db.get("S-test")["vehicleReleased"])
+
+        receipt = dict(
+            eventId="receipt-1",
+            occurredAt="2026-12-01T10:24:00Z",
+            recipientId="C-01",
+            quantityReceived=3,
+        )
+        self.assertEqual(
+            self.http.post(
+                "/shipments/S-test/acknowledge-receipt", json=receipt
+            ).status_code,
+            409,
+        )
+
+        arrival = dict(
+            # This deliberately collides with the internal P2 vehicle-release
+            # activity ID. External IDs must have their own journal namespace.
+            eventId="P2:S-test:VehicleReleased",
+            eventType="ShipmentArrived",
+            shipmentId="S-test",
+            journeyId="J-test",
+            occurredAt="2026-12-01T10:22:00Z",
+            source="p2-manual-test",
+            inputMode="manual",
+            payload={
+                "recipientId": "C-01",
+                "latitude": 48.8566,
+                "longitude": 2.3522,
+            },
+        )
+        for _ in range(2):
+            response = self.http.post("/shipments/S-test/arrive", json=arrival)
+            self.assertEqual(response.status_code, 202, response.json)
+        self.assertEqual(
+            self.http.post(
+                "/shipments/S-test/arrive",
+                json={**arrival, "payload": {**arrival["payload"], "recipientId": "C-02"}},
+            ).status_code,
+            409,
+        )
+        arrival_message = next(
+            message
+            for message in self.db.pending_messages()
+            if message["name"] == "ShipmentArrived"
+        )
+        arrival_event = arrival_message["variables"]["arrivalEvent"]
+        self.db.record_arrival("S-test", 999, arrival_event)
+        self.db.record_arrival("S-test", 999, arrival_event)
+        record = self.db.get("S-test")
+        self.assertEqual(record["transportState"], "ARRIVED")
+        self.assertFalse(record["vehicleReleased"])
+
+        for _ in range(2):
+            response = self.http.post(
+                "/shipments/S-test/acknowledge-receipt", json=receipt
+            )
+            self.assertEqual(response.status_code, 202, response.json)
+        receipt_message = next(
+            message
+            for message in self.db.pending_messages()
+            if message["name"] == "ReceiptAcknowledged"
+        )
+        receipt_event = receipt_message["variables"]["receiptEvent"]
+        self.db.release_vehicle("S-test", 999, receipt_event)
+        record = self.db.get("S-test")
+        self.assertEqual(record["transportState"], "COMPLETED")
+        self.assertTrue(record["vehicleReleased"])
+        self.db.release_vehicle("S-test", 999, receipt_event)
+        events = self.db.events("S-test")
+        arrival_record = next(e for e in events if e["eventType"] == "ShipmentArrived")
+        self.assertEqual(
+            arrival_record["producerEventId"], "P2:S-test:VehicleReleased"
+        )
+        self.assertIn("P2:external:ShipmentArrived:S-test:", arrival_record["eventId"])
+        self.assertEqual(
+            sum(event["eventType"] == "ShipmentArrived" for event in events),
+            1,
+        )
+        self.assertEqual(
+            sum(event["eventType"] == "ReceiptAcknowledged" for event in events),
+            1,
+        )
+        self.assertEqual(
+            sum(event["eventType"] == "VehicleReleased" for event in events),
+            1,
+        )
+        self.create(shipment="S-next", journey="J-next", vehicle="V-01")
+
+    def test_p2_manual_event_rejects_invalid_time_and_mismatched_receipt(self):
+        unknown_arrival = self.http.post(
+            "/shipments/not-known/arrive",
+            json={
+                "eventId": "unknown-arrival",
+                "occurredAt": "2026-12-01T10:22:00Z",
+                "recipientId": "C-01",
+            },
+        )
+        unknown_receipt = self.http.post(
+            "/shipments/not-known/acknowledge-receipt",
+            json={
+                "eventId": "unknown-receipt",
+                "occurredAt": "2026-12-01T10:24:00Z",
+                "recipientId": "C-01",
+                "quantityReceived": 3,
+            },
+        )
+        self.assertEqual(unknown_arrival.status_code, 404)
+        self.assertEqual(unknown_receipt.status_code, 404)
+        self.loading_wait()
+        self.verify()
+        self.db.advance(
+            "S-test",
+            self.key,
+            "AWAITING_LOADING",
+            "AWAITING_DISPATCH",
+            "LoadingVerified",
+        )
+        self.db.reserve_command("S-test", "DispatchApproved", "dispatcher")
+        self.db.advance(
+            "S-test", self.key, "AWAITING_DISPATCH", "DISPATCHED", "ShipmentDispatched"
+        )
+        dispatch_event = next(
+            event
+            for event in self.db.events("S-test")
+            if event["eventType"] == "ShipmentDispatched"
+        )
+        self.db.start_transport("S-test", 999, dispatch_event)
+        self.db.start_journey("S-test", 999)
+        arrival = dict(
+            eventId="arrival-bad-time",
+            occurredAt="not-a-timestamp",
+            recipientId="C-01",
+        )
+        self.assertEqual(
+            self.http.post("/shipments/S-test/arrive", json=arrival).status_code,
+            400,
+        )
+        arrival["occurredAt"] = "2026-12-01T10:22:00Z"
+        self.assertEqual(
+            self.http.post("/shipments/S-test/arrive", json=arrival).status_code,
+            202,
+        )
+        arrival_event = next(
+            message["variables"]["arrivalEvent"]
+            for message in self.db.pending_messages()
+            if message["name"] == "ShipmentArrived"
+        )
+        self.db.record_arrival("S-test", 999, arrival_event)
+        bad_receipt = dict(
+            eventId="receipt-wrong-count",
+            occurredAt="2026-12-01T10:24:00Z",
+            recipientId="C-01",
+            quantityReceived=2,
+        )
+        self.assertEqual(
+            self.http.post(
+                "/shipments/S-test/acknowledge-receipt", json=bad_receipt
+            ).status_code,
+            409,
+        )
+        self.assertFalse(self.db.get("S-test")["vehicleReleased"])
+
+    def test_upgrade_repairs_legacy_receipt_vehicle_release_collision(self):
+        self.loading_wait()
+        self.verify()
+        self.db.advance(
+            "S-test", self.key, "AWAITING_LOADING", "AWAITING_DISPATCH", "LoadingVerified"
+        )
+        self.db.reserve_command("S-test", "DispatchApproved", "dispatcher")
+        self.db.advance(
+            "S-test", self.key, "AWAITING_DISPATCH", "DISPATCHED", "ShipmentDispatched"
+        )
+        dispatch = next(
+            event
+            for event in self.db.events("S-test")
+            if event["eventType"] == "ShipmentDispatched"
+        )
+        self.db.start_transport("S-test", 999, dispatch)
+        self.db.start_journey("S-test", 999)
+        arrival = {
+            "eventId": "arrival-upgrade",
+            "occurredAt": "2026-12-01T10:22:00Z",
+            "recipientId": "C-01",
+        }
+        self.assertEqual(self.http.post("/shipments/S-test/arrive", json=arrival).status_code, 202)
+        arrival_event = next(
+            message["variables"]["arrivalEvent"]
+            for message in self.db.pending_messages()
+            if message["name"] == "ShipmentArrived"
+        )
+        self.db.record_arrival("S-test", 999, arrival_event)
+
+        receipt = {
+            "eventId": "P2:S-test:VehicleReleased",
+            "occurredAt": "2026-12-01T10:24:00Z",
+            "recipientId": "C-01",
+            "quantityReceived": 3,
+        }
+        self.assertEqual(
+            self.http.post("/shipments/S-test/acknowledge-receipt", json=receipt).status_code,
+            202,
+        )
+        receipt_event = next(
+            message["variables"]["receiptEvent"]
+            for message in self.db.pending_messages()
+            if message["name"] == "ReceiptAcknowledged"
+        )
+
+        # Simulate the previous version: receipt activity occupied the internal
+        # VehicleReleased ID, while the completed state was already persisted.
+        with self.db.transaction() as db:
+            record = self.db.read(db, "S-test")
+            record.update(transportState="COMPLETED", vehicleReleased=True)
+            self.db.event(
+                db,
+                record,
+                "ReceiptAcknowledged",
+                actor=receipt_event["source"],
+                process="P2",
+                event_id=receipt_event["eventId"],
+                payload=receipt_event["payload"],
+                occurred_at=receipt_event["occurredAt"],
+                recorded_at=receipt_event["recordedAt"],
+                source=receipt_event["source"],
+                input_mode=receipt_event["inputMode"],
+            )
+            self.db.save(db, record)
+
+        for _ in range(2):
+            record = self.db.release_vehicle("S-test", 999, receipt_event)
+            self.assertEqual(record["transportState"], "COMPLETED")
+            self.assertTrue(record["vehicleReleased"])
+        events = self.db.events("S-test")
+        receipt_activities = [e for e in events if e["eventType"] == "ReceiptAcknowledged"]
+        release_activities = [e for e in events if e["eventType"] == "VehicleReleased"]
+        self.assertEqual(len(receipt_activities), 1)
+        self.assertEqual(len(release_activities), 1)
+        self.assertEqual(receipt_activities[0]["producerEventId"], receipt["eventId"])
+
     def test_invalid_input(self):
         for change in (
             {"quantity": True},
@@ -611,6 +873,7 @@ class Preparation(unittest.TestCase):
                 "CREATE TABLE inventory (id INTEGER PRIMARY KEY, available INTEGER NOT NULL)"
             )
             db.execute("INSERT INTO inventory VALUES (1,17)")
+        db.close()
         before = path.read_bytes()
         with self.assertRaisesRegex(ValueError, "legacy pooled stock"):
             Registry(path)
@@ -636,6 +899,44 @@ class Preparation(unittest.TestCase):
         self.assertEqual(record["productId"], "PRD-004")
         self.assertEqual(record["batchId"], "DEMO-CHICKEN-001")
         self.assertEqual(record["quantity"], 15)
+
+    def test_demo_manual_actions_post_to_the_event_endpoints(self):
+        from tools import demo
+
+        self.create(shipment="demo-A", vehicle="V-01", quantity=15)
+        shipment = self.db.get("demo-A")
+        calls = []
+
+        def local_http(base, path, data=None):
+            calls.append((path, data))
+            if path == "/shipments/demo-A":
+                return 200, shipment
+            if path == "/shipments/demo-A/events":
+                return 200, [
+                    {
+                        "eventType": "ShipmentCreated",
+                        "occurredAt": "2026-11-11T10:00:00Z",
+                    }
+                ]
+            return 202, {"accepted": True}
+
+        with (
+            patch.object(demo, "http", side_effect=local_http),
+            patch.object(demo, "wait_for_action"),
+            patch("builtins.input", return_value="A"),
+            patch("builtins.print"),
+        ):
+            demo.perform("http://example.test", "9")
+            demo.perform("http://example.test", "10")
+
+        posted_paths = [path for path, data in calls if data is not None]
+        self.assertEqual(
+            posted_paths,
+            [
+                "/shipments/demo-A/arrive",
+                "/shipments/demo-A/acknowledge-receipt",
+            ],
+        )
 
 
 class Compliance(unittest.TestCase):

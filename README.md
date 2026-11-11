@@ -23,13 +23,13 @@ The [dataset reference](docs/RUNNING.md#demonstration-dataset) lists all product
 | Process | Execution platform | Status |
 | --- | --- | --- |
 | P1 — Shipment preparation | Camunda / Zeebe | Stock wait/cancellation, dispatch handoff and local compliance verification implemented |
-| P2 — Transport and delivery | Camunda / Zeebe | Dispatch receiver implemented; transport workflow planned |
+| P2 — Transport and delivery | Camunda / Zeebe | Manual flow implemented; full P2 in progress — see the [detailed handover](docs/COLD-CHAIN-INTEGRATION-AGREEMENT.md#p2-and-p3-development-handover) |
 | P3 — Receiving and stock admission | Camunda / Zeebe | Planned |
 | P4 — Quality incident investigation | DCR | Planned |
 | P5 — Corrective fulfilment | Camunda / Zeebe | Planned |
 | P6 — Supplier claim resolution | Camunda / Zeebe | Planned |
 
-P1 supports shipment creation, stock checking, replenishment or cancellation during shortages, loading verification and dispatch. Dispatch starts a protected P2 transport instance carrying the shipment details. P1 has a DCR compliance graph, an XES execution log and local conformance checks. The remaining transport workflow, P3–P6, Siddhi processing and external API adapters are under development; P1 course-tool compliance checking has passed.
+P1 supports shipment creation, stock checking, replenishment or cancellation during shortages, loading verification and dispatch. Dispatch starts a protected P2 transport instance carrying shipment details. P2 reaches completion through manual arrival and receipt inputs; it holds the vehicle until receipt acknowledgement. These inputs do not notify P3. P1 has a DCR compliance graph and XES execution log; P2 DCR verification remains outstanding. GPS simulation, TomTom ETA, delivery-risk decisions, Siddhi processing and P3–P6 are planned follow-up work.
 
 ## Architecture
 
@@ -89,9 +89,9 @@ With the stack running and both vehicles available, run the engine integration c
 .venv/bin/python stage_tests/check_stage1.py
 ```
 
-The integration check exercises normal dispatch, stock-wait cancellation and replenishment/recheck; it leaves two P2 instances waiting for transport implementation. See the [run guide](docs/RUNNING.md) before repeating it or switching to a manual scenario.
+The live integration check exercises P1 stock wait/cancellation/replenishment and completes two independent P2 journeys through manual arrival and receipt. It confirms early receipt is rejected, exact retries do not duplicate activities, both Zeebe instances reach the `TransportCompleted` end event, and a released vehicle can be reused. It leaves no dispatched shipment waiting for arrival; see the [run guide](docs/RUNNING.md) before repeating it.
 
-The five-product checkpoint passes **29 offline tests**, both BPMN lints, Compose validation, live P1/P2 scenarios and persistence after stack recreation. A clean-copy run used fresh dependencies and engine data; a later metadata-only XML correction passed local replay and ProcessDoctor. The [verification report](compliance/p1/verification.json) records source/model hashes, inventory and results; the [XES log](compliance/p1/execution-log.xes) contains the actual P1 activities. ProcessDoctor reports all three real traces as conforming with zero violations; [reproduction steps and screenshots](docs/RUNNING.md#processdoctor-conformance-check) are included.
+The offline suite contains **33 tests**; run the committed live P1/P2 check separately against a fresh stack. P1 compliance evidence is stored under `compliance/p1/`; that XES contains P1 activities only. A live run writes P2 execution evidence to `runtime/verification-results/p2-completion.json`, not a P2 DCR conformance result. The committed P1 report and ProcessDoctor screenshots document P1 conformance only.
 
 ## Repository structure
 
@@ -117,9 +117,9 @@ P4 will use DCR to **execute** the quality investigation. Its model will belong 
 
 ## Continuing with P2 and P3
 
-Start from this checkpoint, run its tests and demonstration once, then create a feature branch such as `feat/p2-transport` or `feat/p3-receiving`. The [P2/P3 handover](docs/COLD-CHAIN-INTEGRATION-AGREEMENT.md#p2-and-p3-development-handover) identifies the files to extend, the existing dispatch contract and the arrival/receipt/quality interfaces still to implement.
+P2's manual flow is implemented from `ShipmentDispatched` through arrival, receipt acknowledgement, transport completion and vehicle release. Full P2 remains in progress. See the [P2/P3 handover](docs/COLD-CHAIN-INTEGRATION-AGREEMENT.md#p2-and-p3-development-handover) for current contracts, worker entry points, manual-only inputs and remaining implementation checks.
 
-**P1 owner: Ashvanth.** P2–P6 owners remain to be assigned. P2's transport receiver is already wired into the shared application; P3 has no executable model or endpoints yet. Coordinate changes to shared Python files and message contracts, and update the task board and checks in the same pull request. P1's teammate review remains pending.
+**P1 owner: Ashvanth. P2 manual-flow owner: Rahul.** P3–P6 and simulator/CEP owners remain to be assigned. P3 has no executable receiving model or notification consumer; the P2 receipt input is manual/test only. Coordinate future shared Python and message-contract changes with the receiving owner and keep the handover/task board current. P2's full simulator and risk-decision scope is not complete.
 
 ## Project documentation
 

@@ -1,11 +1,11 @@
 # Team task board
 
-**Ashvanth owns P1.** P2–P6 and shared component coordinators remain unassigned. Use `TODO`, `IN PROGRESS`, `IMPLEMENTED / VERIFY`, `BLOCKED` and `DONE`. A checked box records only the specific item described.
+**Ashvanth owns P1; Rahul owns the current P2 manual-flow increment.** P3–P6 and simulator/CEP owners remain unassigned. Use `TODO`, `IN PROGRESS`, `IMPLEMENTED / VERIFY`, `BLOCKED` and `DONE`. A checked box records only the specific item described.
 
 | Work | Owner | Status | Main dependency |
 | --- | --- | --- | --- |
 | P1 Shipment preparation | Ashvanth | IMPLEMENTED; engine and external conformance verified | Teammate review |
-| P2 Transport and delivery | Ashvanth and  | IN PROGRESS; handoff receiver verified | Simulator and remaining transport workflow |
+| P2 Transport and delivery | Rahul | MANUAL FLOW IMPLEMENTED; full P2 IN PROGRESS | [Detailed handover](../docs/COLD-CHAIN-INTEGRATION-AGREEMENT.md#p2-and-p3-development-handover); P3 contract, simulator, ETA and risk decisions |
 | P3 Receiving and admission | Unassigned | TODO | P2 arrival + P4 shared hold |
 | P4 Quality investigation (DCR) | Unassigned | TODO | DCR access + incident integration |
 | P5 Corrective fulfilment | Unassigned | TODO | P4 authorised disposition + P1–P3 |
@@ -58,13 +58,22 @@ The catalogue and scope assumptions are documented in [the run guide](../docs/RU
 ## P2 — Transport and delivery
 
 - [x] Consume `ShipmentDispatched`, register one transport instance and acknowledge the handoff; reject duplicate effects.
-- [ ] Extend the waiting P2 model into the transport workflow and start its simulated journey.
+- [x] Extend P2 through `StartJourney`, arrival catch/recording, receipt catch, vehicle release and `TransportCompleted`.
+- [x] Add manual/test arrival and receipt endpoints, transactional states/activities, exact retries and vehicle-release gating.
+- [x] Extend the CLI for manual arrival/receipt, state-aware Operate hints and polling to `ARRIVED`/`COMPLETED`.
+- [x] Add a regression for external event IDs colliding with internal activity IDs.
+- [x] Run the 33-test offline suite at tested commit `720ed5109fc26ec5b128f87010d01b62bc9628e4`; command: `python -m unittest discover -s stage_tests -p 'test_*.py' -v`.
+- [x] Run `stage_tests/check_stage1.py` on a fresh version-3 dataset and verify two P2 completions, receipt gating, retries, Zeebe end events and vehicle reuse. P1 compliance artifacts: `runtime/verification-results/execution-log.xes` and `verification.json`; P2 execution evidence: `runtime/verification-results/p2-completion.json`. This live report is from the manual-flow validation run; the later legacy-collision repair is covered by the offline regression at tested commit `720ed5109fc26ec5b128f87010d01b62bc9628e4`. Runtime evidence is local/ignored; P2 JSON is not DCR conformance evidence.
+- [x] Manually observe the CLI/Operate flow through `WaitForReceiptAcknowledged`, `TransportCompleted` and vehicle release.
+- [ ] Add the durable P2-arrival-to-P3 notification after agreeing its contract with the P3 owner.
 - [ ] Produce scripted GPS; fetch fresh traffic-aware TomTom ETA for remaining route.
-- [ ] Handle delivery risk with an explicit dispatcher decision.
-- [ ] Send approved route change through Siddhi; record acknowledgement and changed movement/ETA.
-- [ ] Produce `ShipmentArrived`; wait for P3's `ReceiptAcknowledged` before completion.
-- [ ] Release the vehicle reservation only after the agreed completion condition.
-- [ ] Prove missing receipt blocks completion, route change is observable and journeys stay independent.
+- [ ] Handle `DeliveryRiskDetected` with an explicit, deduplicated dispatcher decision.
+- [ ] Send approved route changes through Siddhi and the simulator; record acknowledgement and changed movement/ETA.
+- [ ] Add dispatcher CLI controls for risk decisions and route changes.
+- [ ] Deliver P2 DCR rules and a real execution log; verify conformance separately from P1.
+- [ ] Verify full P2 integrations: automatic arrival, risk handling, route change acknowledgement and independent journeys.
+
+Follow-up PR/issue links and owners have not been agreed yet. Add the links and named owners here once the team assigns them; keep P3 notification, GPS/automatic arrival, TomTom ETA, risk decisions, acknowledged route changes, dispatcher CLI controls and P2 DCR verification as separate deliverables. See the [file-by-file handover](../docs/COLD-CHAIN-INTEGRATION-AGREEMENT.md#full-p2-work-still-outstanding).
 
 ## P3 — Receiving and stock admission
 
