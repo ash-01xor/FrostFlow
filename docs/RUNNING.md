@@ -22,7 +22,7 @@ All products carry the placeholder `temperatureProfileId: CHILLED-DEMO`. It iden
 
 `GET /stock` lists each product/batch, pack definition, initial crates and current availability. Its top-level `available` is only the sum across products; shipment eligibility uses the selected product/batch. The response also contains `datasetVersion: 3` and `shipmentCount`.
 
-The local dataset stores product definitions, batch inventory, shipment/vehicle reservations, states and P1/P2 engine keys, activity history, pending messages/acknowledgements and retry identities in SQLite under the selected `REGISTRY_DIR`. Zeebe/Elasticsearch store engine execution and inspection records in the matching Docker volumes. Generated databases and raw run output are ignored by Git. Reviewed execution evidence is retained under `compliance/p1/`.
+The local dataset stores product definitions, batch inventory, shipment/vehicle reservations, states and P1/P2 engine keys, activity history, pending messages/acknowledgements and retry identities in SQLite under the selected `REGISTRY_DIR`. Zeebe/Elasticsearch store engine execution and inspection records in the matching Docker volumes. Generated databases and live-run evidence are ignored under `runtime/`. The committed `compliance/p1/` files are P1 conformance evidence, not P2 execution evidence.
 
 ## Start the application
 
@@ -42,17 +42,17 @@ docker compose ps
 docker compose logs --tail=100 communication zeebe
 ```
 
-The walkthrough needs fresh inventory (20 crates of each of five products; 100 total) and available vehicles. Use either the automated check or the manual scenario first: both reserve vehicles. Previous local demonstrations may already have consumed these resources. See persistence/reset below; changing shipment IDs alone does not release a vehicle.
+The walkthrough needs fresh inventory (20 crates of each of five products; 100 total) and available vehicles. The automated check completes two P2 transports and exercises a released vehicle; the manual scenario reserves its vehicle until receipt acknowledgement. Previous local demonstrations may already have consumed these resources. See persistence/reset below; changing shipment IDs alone does not release a vehicle.
 
 ## Presentation controls
 
 After starting a fresh stack, run:
 
 ```bash
-python3 tools/demo.py
+python tools/demo.py
 ```
 
-This terminal menu sends the same application requests as the commands below. It waits for the resulting state and prints the P1/P2 instance keys to find in Operate. Choose an action number, then shipment **A**, **B** or **C**. Creation also offers a choice of all five products; press Enter to use milk for the shortage scenario. `python3 tools/demo.py --check` checks readiness and stock without changing data.
+This terminal menu sends the same application requests as the commands below. It waits for state changes and prints P1/P2 instance keys to find in Operate. Choose an action number, then shipment **A**, **B** or **C**. Creation also offers a choice of all five products; press Enter to use milk for the shortage scenario. Actions **9** and **10** submit the manual arrival and receipt events. Arrival polls until `ARRIVED` while the vehicle remains reserved; receipt polls until `COMPLETED` with `vehicleReleased: true`. Stable event IDs and timestamps make retrying the same menu action an exact retry. `python tools/demo.py --check` checks readiness and stock without changing data.
 
 For the normal P1 demonstration:
 
@@ -61,7 +61,9 @@ For the normal P1 demonstration:
 | 1, then A | Create 15-crate milk order (product 1); reserve stock and await loading | Find P1's printed key in Operate; it is waiting for a warehouse confirmation |
 | 4, then A | Dispatch is rejected | Loading verification is required |
 | 3, then A | Confirm the simulated loading checks | P1 moves to the dispatch-approval wait |
-| 4, then A | Dispatch; register P2 | P1 completes; P2 starts the journey and waits for the manual arrival input |
+| 4, then A | Dispatch; register P2 | P1 completes; P2 starts the journey and waits at `WaitForShipmentArrived` |
+| 9, then A | Submit manual/test arrival | P2 records arrival, remains active at `WaitForReceiptAcknowledged`, and keeps V-01 reserved |
+| 10, then A | Submit manual/test receipt acknowledgement | P2 reaches `TransportCompleted`; registry shows `COMPLETED` and releases V-01 |
 
 For a stock exception, choose **1, B**, then milk again: 10 milk crates are requested while only five milk crates remain. The other four products still have 20 crates each; they cannot satisfy this order. Show the stock-wait gateway, then choose either **5, B** to replenish five milk crates and continue preparation, or **6, B** to cancel. After cancelling B, **1, C** creates another stock-wait case on the released vehicle if you want to rehearse the other branch. Menu **2** displays state/keys; **7** displays the activity history; **8** lists product/batch stock; **0** exits without stopping the stack.
 
@@ -164,15 +166,7 @@ curl -s http://localhost:5001/shipments/S-003/events
 
 P1 reaches `DISPATCHED`. Poll until `handoffStatus` is `ACKNOWLEDGED`: the record now includes a distinct `p2ProcessInstanceKey`; P2 starts the journey and waits at **Wait for shipment arrival** with `transportState: IN_TRANSIT`. Inspect P2 variables for shipment, journey, product, batch, unit/pack definition, vehicle, recipient, route, quantity and deadline. Repeat verification/dispatch attempts return 409.
 
-For the manual P2 skeleton, submit arrival after the journey starts:
-
-```bash
-curl -s -i -X POST http://localhost:5001/shipments/S-001/arrive \
-  -H 'Content-Type: application/json' \
-  -d '{"eventId":"arr-S-001-001","occurredAt":"2026-11-15T10:22:00Z","recipientId":"C-01"}'
-```
-
-P2 records arrival, then waits for **Wait for receipt acknowledgement**. A test receiver can submit:
+For a manual P2 run, the menu above polls after arrival and receipt. The equivalent API inputs are below. First, an early receipt must be rejected with HTTP **409** while transport is `IN_TRANSIT`:
 
 ```bash
 curl -s -i -X POST http://localhost:5001/shipments/S-001/acknowledge-receipt \
@@ -180,9 +174,47 @@ curl -s -i -X POST http://localhost:5001/shipments/S-001/acknowledge-receipt \
   -d '{"eventId":"receipt-S-001-001","occurredAt":"2026-11-15T10:24:00Z","recipientId":"C-01","quantityReceived":15,"receiptReference":"RCPT-001"}'
 ```
 
-These endpoints are manual/test inputs; the receipt endpoint stands in for P3 until its service is connected. Both events are correlated by `shipmentId`. P2 rejects an acknowledgement before arrival and releases the vehicle only after the receipt acknowledgement is processed. Exact retries with the same event ID and content are safe; changed content is rejected.
+After arrival is accepted with HTTP **202**, poll `GET /shipments/S-001` until `transportState` is `ARRIVED` and `vehicleReleased` is `false`. In Windows PowerShell:
 
-Repeat the loading/dispatch steps for S-001 to inspect two independent transports. Exercise each P2 instance using its own shipment ID with the manual arrival and receipt endpoints above. The GPS simulator and live P3 connection remain future work. Damaged-packaging handling is outside this increment: all loading checks must be true for verification.
+```powershell
+do {
+  $record = Invoke-RestMethod http://localhost:5001/shipments/S-001
+  if ($record.transportState -ne "ARRIVED") { Start-Sleep -Seconds 1 }
+} while ($record.transportState -ne "ARRIVED")
+$record | Format-List shipmentId,transportState,vehicleReleased
+```
+
+In Operate, the P2 instance passes the `WaitForShipmentArrived` message catch and activates `WaitForReceiptAcknowledged`; it cannot reach the `TransportCompleted` end event yet.
+
+```bash
+curl -s -i -X POST http://localhost:5001/shipments/S-001/arrive \
+  -H 'Content-Type: application/json' \
+  -d '{"eventId":"arr-S-001-001","occurredAt":"2026-11-15T10:22:00Z","recipientId":"C-01"}'
+```
+
+Submit the same receipt payload after arrival; expect **202**:
+
+```bash
+curl -s -i -X POST http://localhost:5001/shipments/S-001/acknowledge-receipt \
+  -H 'Content-Type: application/json' \
+  -d '{"eventId":"receipt-S-001-001","occurredAt":"2026-11-15T10:24:00Z","recipientId":"C-01","quantityReceived":15,"receiptReference":"RCPT-001"}'
+```
+
+Then poll until `transportState` is `COMPLETED` and `vehicleReleased` is `true`:
+
+```powershell
+do {
+  $record = Invoke-RestMethod http://localhost:5001/shipments/S-001
+  if ($record.transportState -ne "COMPLETED" -or -not $record.vehicleReleased) {
+    Start-Sleep -Seconds 1
+  }
+} while ($record.transportState -ne "COMPLETED" -or -not $record.vehicleReleased)
+$record | Format-List shipmentId,transportState,vehicleReleased
+```
+
+In Operate, confirm `ReleaseVehicle` completes and the process reaches `TransportCompleted`.
+
+Both endpoints accept manual/test inputs only. `ShipmentArrived` and `ReceiptAcknowledged` correlate by `shipmentId`; the receipt endpoint stands in for P3 and does not send a P3 notification. Retrying the exact same event ID and payload returns **202** and does not duplicate journal activities. Reusing an event ID with different content, or submitting an event in the wrong state, returns **409**. A new live check below exercises two shipments independently, their early-receipt rejection, exact retries, engine completion and vehicle reuse. P2 DCR model/log verification remains outstanding; the live JSON report is execution evidence only. The GPS simulator and live P3 connection remain follow-up work. Damaged-packaging handling is outside this increment: all loading checks must be true for verification.
 
 ## What the BPMN and Python each do
 
@@ -283,7 +315,7 @@ npx --yes @camunda8/cli@4.6.1 bpmn lint bpmn/shipment_preparation.bpmn
 npx --yes @camunda8/cli@4.6.1 bpmn lint bpmn/transport.bpmn
 ```
 
-The offline tests substitute engine calls; they cover five-product seed data, product/batch validation, isolated inventory, concurrent reservation, targeted supply, restart persistence, legacy-data protection, XES traceability, retry identities, cancellation, outbox handling, P2 guards and DCR replay. The first-commit review passed 28 offline tests in a clean copy with freshly installed dependencies, both BPMN lints, Python checks and Compose validation. The portal-format regression brings the current suite to 29 passing tests. A fresh five-product engine run verified the three scenarios, P2 product/batch variables, independent inventory and local DCR replay. Inventory, case mappings and duplicate guards survived stack recreation. The temporary review stack was removed afterwards; existing practice datasets were preserved.
+The offline suite contains **31 tests** covering five-product seed data, product/batch validation, isolated inventory, concurrent reservation, targeted supply, restart persistence, legacy-data protection, XES traceability, retry identities, cancellation, outbox handling, P2 state guards and DCR replay. They stub engine calls; they do not replace the live P2 completion check below.
 
 Against a fresh, healthy stack:
 
@@ -291,7 +323,7 @@ Against a fresh, healthy stack:
 .venv/bin/python stage_tests/check_stage1.py
 ```
 
-This executes all three scenarios, checks exported P1 completion and P2 arrival waits, publishes duplicate dispatch messages and checks that only one P2 exists per dispatched shipment. It exports **actual P1 activities** to `runtime/verification-results/execution-log.xes`, replays them against the DCR XML and writes a verification report. P2 activities are deliberately excluded from the P1 conformance trace. Both vehicles remain reserved by the two P2 cases waiting for arrival afterwards.
+This runs the stock-wait/cancellation/replenishment P1 scenarios, completes two independent P2 transports through the manual endpoints, and verifies the P2 end events, exact retry counts, early-receipt rejection and reuse of a released vehicle. It requires a fresh version-3 dataset with all 100 crates and both vehicles available. It writes P1 compliance artifacts to `runtime/verification-results/execution-log.xes` and `verification.json`; the XES contains P1 activities only. Separate P2 execution evidence is written to `runtime/verification-results/p2-completion.json`. That P2 report is not DCR conformance evidence; a P2 DCR model/log has not yet been delivered.
 
 The reviewed five-product [execution log](../compliance/p1/execution-log.xes) and [verification report](../compliance/p1/verification.json) contain actual execution evidence and source/model hashes from this checkpoint. Regenerate and review them when implementation or models change. The report also records successful ProcessDoctor import/conformance and the metadata-only model correction. Repeat external conformance checking when the rules or log change. P1 ownership is recorded in the project documentation. The BPMN source and PDF omit student attribution at the owner's request. The DCR display title includes the owner; its semantics are unchanged and the report preserves the hashes used in the original checks. Model PDFs can be exported in Modeler or with [bpmn-to-image](https://github.com/bpmn-io/bpmn-to-image):
 

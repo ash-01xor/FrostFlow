@@ -119,6 +119,7 @@ class Registry:
         recorded_at=None,
         source=None,
         input_mode=None,
+        producer_event_id=None,
     ):
         event_id = event_id or f"{process}:{record['shipmentId']}:{activity}"
         row = db.execute("SELECT data FROM events WHERE id=?", (event_id,)).fetchone()
@@ -174,8 +175,41 @@ class Registry:
         for optional in ("originalShipmentId", "incidentId"):
             if optional in record:
                 event[optional] = record[optional]
+        if producer_event_id is not None:
+            event["producerEventId"] = producer_event_id
         db.execute("INSERT INTO events VALUES (?,?)", (event_id, json.dumps(event)))
         return event
+
+    @staticmethod
+    def transport_event_journal_id(shipment_id, event_type, producer_event_id):
+        """Keep producer IDs in a namespace separate from internal activities."""
+        return f"P2:external:{event_type}:{shipment_id}:{producer_event_id}"
+
+    @classmethod
+    def migrate_legacy_transport_event(
+        cls, db, shipment_id, event_type, producer_event_id
+    ):
+        """Move a pre-namespace external event off a colliding internal ID."""
+        legacy = db.execute(
+            "SELECT data FROM events WHERE id=?", (producer_event_id,)
+        ).fetchone()
+        if legacy is None:
+            return
+        event = json.loads(legacy[0])
+        if event.get("shipmentId") != shipment_id or event.get("eventType") != event_type:
+            return
+        journal_id = cls.transport_event_journal_id(
+            shipment_id, event_type, producer_event_id
+        )
+        if db.execute("SELECT 1 FROM events WHERE id=?", (journal_id,)).fetchone():
+            db.execute("DELETE FROM events WHERE id=?", (producer_event_id,))
+            return
+        event["eventId"] = journal_id
+        event["producerEventId"] = producer_event_id
+        db.execute(
+            "UPDATE events SET id=?, data=? WHERE id=?",
+            (journal_id, json.dumps(event), producer_event_id),
+        )
 
     @staticmethod
     def enqueue(db, message_id, name, correlation, variables, needs_ack=False):
@@ -622,10 +656,6 @@ class Registry:
                 raise Conflict(
                     "quantityReceived must match the dispatched crate quantity"
                 )
-            if db.execute(
-                "SELECT 1 FROM events WHERE id=?", (event_id,)
-            ).fetchone():
-                raise Conflict("eventId is already used by another recorded event")
             for (raw,) in db.execute(
                 "SELECT data FROM results WHERE id LIKE 'transport-input:%'"
             ):
@@ -705,8 +735,14 @@ class Registry:
             accepted = self.require_transport_event(
                 db, shipment_id, "ShipmentArrived", arrival_event
             )
+            journal_id = self.transport_event_journal_id(
+                shipment_id, "ShipmentArrived", accepted["eventId"]
+            )
+            self.migrate_legacy_transport_event(
+                db, shipment_id, "ShipmentArrived", accepted["eventId"]
+            )
             if db.execute(
-                "SELECT 1 FROM events WHERE id=?", (accepted["eventId"],)
+                "SELECT 1 FROM events WHERE id=?", (journal_id,)
             ).fetchone():
                 return record
             if record.get("transportState") != "IN_TRANSIT":
@@ -721,12 +757,13 @@ class Registry:
                 "ShipmentArrived",
                 actor=accepted["source"],
                 process="P2",
-                event_id=accepted["eventId"],
+                event_id=journal_id,
                 payload=accepted["payload"],
                 occurred_at=accepted["occurredAt"],
                 recorded_at=accepted["recordedAt"],
                 source=accepted["source"],
                 input_mode=accepted["inputMode"],
+                producer_event_id=accepted["eventId"],
             )
             self.save(db, record)
             return record
@@ -738,12 +775,29 @@ class Registry:
             accepted = self.require_transport_event(
                 db, shipment_id, "ReceiptAcknowledged", receipt_event
             )
+            receipt_journal_id = self.transport_event_journal_id(
+                shipment_id, "ReceiptAcknowledged", accepted["eventId"]
+            )
+            self.migrate_legacy_transport_event(
+                db, shipment_id, "ReceiptAcknowledged", accepted["eventId"]
+            )
             if record.get("vehicleReleased"):
-                if not db.execute(
-                    "SELECT 1 FROM events WHERE id=?",
+                vehicle_event = db.execute(
+                    "SELECT data FROM events WHERE id=?",
                     (f"P2:{shipment_id}:VehicleReleased",),
-                ).fetchone():
+                ).fetchone()
+                if vehicle_event is None:
                     raise Conflict("vehicle release state has no recorded activity")
+                if json.loads(vehicle_event[0]).get("eventType") != "VehicleReleased":
+                    self.migrate_legacy_transport_event(
+                        db,
+                        shipment_id,
+                        json.loads(vehicle_event[0]).get("eventType"),
+                        json.loads(vehicle_event[0]).get("producerEventId")
+                        or json.loads(vehicle_event[0]).get("eventId"),
+                    )
+                    self.event(db, record, "VehicleReleased", process="P2")
+                    self.save(db, record)
                 return record
             if record.get("transportState") != "ARRIVED":
                 raise Conflict(
@@ -756,12 +810,13 @@ class Registry:
                 "ReceiptAcknowledged",
                 actor=accepted["source"],
                 process="P2",
-                event_id=accepted["eventId"],
+                event_id=receipt_journal_id,
                 payload=accepted["payload"],
                 occurred_at=accepted["occurredAt"],
                 recorded_at=accepted["recordedAt"],
                 source=accepted["source"],
                 input_mode=accepted["inputMode"],
+                producer_event_id=accepted["eventId"],
             )
             self.event(db, record, "VehicleReleased", process="P2")
             self.save(db, record)

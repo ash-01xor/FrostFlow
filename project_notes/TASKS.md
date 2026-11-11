@@ -1,11 +1,11 @@
 # Team task board
 
-**Ashvanth owns P1.** P2–P6 and shared component coordinators remain unassigned. Use `TODO`, `IN PROGRESS`, `IMPLEMENTED / VERIFY`, `BLOCKED` and `DONE`. A checked box records only the specific item described.
+**Ashvanth owns P1; Rahul owns the current P2 manual-flow increment.** P3–P6 and simulator/CEP owners remain unassigned. Use `TODO`, `IN PROGRESS`, `IMPLEMENTED / VERIFY`, `BLOCKED` and `DONE`. A checked box records only the specific item described.
 
 | Work | Owner | Status | Main dependency |
 | --- | --- | --- | --- |
 | P1 Shipment preparation | Ashvanth | IMPLEMENTED; engine and external conformance verified | Teammate review |
-| P2 Transport and delivery | Ashvanth and  | IN PROGRESS; handoff receiver verified | Simulator and remaining transport workflow |
+| P2 Transport and delivery | Rahul | MANUAL FLOW IMPLEMENTED / VERIFY; full P2 remains in progress | P3 notification contract, simulator, ETA and risk decisions |
 | P3 Receiving and admission | Unassigned | TODO | P2 arrival + P4 shared hold |
 | P4 Quality investigation (DCR) | Unassigned | TODO | DCR access + incident integration |
 | P5 Corrective fulfilment | Unassigned | TODO | P4 authorised disposition + P1–P3 |
@@ -58,13 +58,18 @@ The catalogue and scope assumptions are documented in [the run guide](../docs/RU
 ## P2 — Transport and delivery
 
 - [x] Consume `ShipmentDispatched`, register one transport instance and acknowledge the handoff; reject duplicate effects.
-- [ ] Extend the waiting P2 model into the transport workflow and start its simulated journey.
+- [x] Extend P2 through `StartJourney`, arrival catch/recording, receipt catch, vehicle release and `TransportCompleted`.
+- [x] Add manual/test arrival and receipt endpoints, transactional states/activities, exact retries and vehicle-release gating.
+- [x] Extend the CLI for manual arrival/receipt, state-aware Operate hints and polling to `ARRIVED`/`COMPLETED`.
+- [x] Add a regression for external event IDs colliding with internal activity IDs.
+- [ ] Run `stage_tests/check_stage1.py` on fresh data; preserve separate P1 compliance and P2 execution evidence.
+- [ ] Add the durable P2-arrival-to-P3 notification after agreeing its contract with the P3 owner.
 - [ ] Produce scripted GPS; fetch fresh traffic-aware TomTom ETA for remaining route.
-- [ ] Handle delivery risk with an explicit dispatcher decision.
-- [ ] Send approved route change through Siddhi; record acknowledgement and changed movement/ETA.
-- [ ] Produce `ShipmentArrived`; wait for P3's `ReceiptAcknowledged` before completion.
-- [ ] Release the vehicle reservation only after the agreed completion condition.
-- [ ] Prove missing receipt blocks completion, route change is observable and journeys stay independent.
+- [ ] Handle `DeliveryRiskDetected` with an explicit, deduplicated dispatcher decision.
+- [ ] Send approved route changes through Siddhi and the simulator; record acknowledgement and changed movement/ETA.
+- [ ] Add dispatcher CLI controls for risk decisions and route changes.
+- [ ] Deliver P2 DCR rules and a real execution log; verify conformance separately from P1.
+- [ ] Verify full P2 integrations: automatic arrival, risk handling, route change acknowledgement and independent journeys.
 
 ## P3 — Receiving and stock admission
 

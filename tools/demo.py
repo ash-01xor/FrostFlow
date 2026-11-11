@@ -1,7 +1,7 @@
 """Interactive demonstration controls for the manual-input P1/P2 workflow.
 
 Uses the application's HTTP API; no Docker commands or data resets are performed.
-Run from the repository root: python3 tools/demo.py
+Run from the repository root: python tools/demo.py
 """
 
 import argparse
@@ -23,8 +23,14 @@ LOCATIONS = {
     "AWAITING_LOADING": "In Operate, find P1 waiting at 'Await loading verification'.",
     "WAITING_STOCK": "In Operate, find P1 at 'Await stock or cancellation'.",
     "AWAITING_DISPATCH": "In Operate, find P1 waiting at 'Await dispatch approval'.",
-    "DISPATCHED": "P1 should finish; P2 starts the journey and waits for arrival.",
+    "DISPATCHED": "P1 dispatched; waiting for P2 to acknowledge the handoff.",
     "CANCELLED": "P1 should finish at 'Shipment cancelled'; no P2 is started.",
+}
+TRANSPORT_LOCATIONS = {
+    "AWAITING_JOURNEY_START": "P2 is registering the transport handoff.",
+    "IN_TRANSIT": "In Operate, P2 should be waiting at 'Wait for shipment arrival'.",
+    "ARRIVED": "In Operate, P2 should be waiting at 'Wait for receipt acknowledgement'; the vehicle is still reserved.",
+    "COMPLETED": "P2 has completed after receipt acknowledgement; the vehicle is released.",
 }
 
 
@@ -52,10 +58,32 @@ def show(record):
     if record.get("p2ProcessInstanceKey"):
         print(f"P2 instance key: {record['p2ProcessInstanceKey']}")
         print(f"Dispatch handoff: {record.get('handoffStatus')}")
+        print(f"P2 transport state: {record.get('transportState', 'not started')}")
+        print(f"Vehicle released: {record.get('vehicleReleased', False)}")
     if record.get("pendingCommand"):
         print("The accepted action is still being processed.")
-    print(LOCATIONS.get(record["state"], "Inspect the process in Operate."))
+    hint = TRANSPORT_LOCATIONS.get(record.get("transportState")) or LOCATIONS.get(
+        record["state"], "Inspect the process in Operate."
+    )
+    print(hint)
     print("Operate may take a few seconds to display the latest engine records.")
+
+
+def manual_event_time(base, shipment_id, minutes_after_creation):
+    """Use a stable simulated timestamp so retrying the same event is exact."""
+    status, events = http(base, f"/shipments/{shipment_id}/events")
+    if status != 200:
+        raise RuntimeError(events.get("error", "Cannot read shipment events"))
+    created = next(
+        (event for event in events if event.get("eventType") == "ShipmentCreated"),
+        None,
+    )
+    if created is None:
+        raise RuntimeError("ShipmentCreated activity is not available yet")
+    occurred_at = datetime.fromisoformat(
+        created["occurredAt"].replace("Z", "+00:00")
+    ) + timedelta(minutes=minutes_after_creation)
+    return occurred_at.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
 
 
 def wait_for_action(base, shipment_id, action, old_wait_key=None):
@@ -70,6 +98,13 @@ def wait_for_action(base, shipment_id, action, old_wait_key=None):
             finished = record.get("handoffStatus") == "ACKNOWLEDGED"
         elif action == "verify-loading":
             finished = record["state"] == "AWAITING_DISPATCH"
+        elif action == "arrive":
+            finished = record.get("transportState") in ("ARRIVED", "COMPLETED")
+        elif action == "acknowledge-receipt":
+            finished = (
+                record.get("transportState") == "COMPLETED"
+                and record.get("vehicleReleased") is True
+            )
         elif action == "cancel":
             finished = record["state"] == "CANCELLED"
         else:
@@ -151,6 +186,27 @@ def perform(base, choice):
             batchId=product["batchId"],
             deliveryDeadline=deadline,
         )
+    elif choice in ("9", "10"):
+        status, record = http(base, path)
+        if status != 200:
+            print("Not available:", record.get("error"))
+            return
+        if choice == "9":
+            action = "arrive"
+            data = {
+                "eventId": f"demo-arrival-{shipment_id}",
+                "occurredAt": manual_event_time(base, shipment_id, 5),
+                "recipientId": record["recipientId"],
+            }
+        else:
+            action = "acknowledge-receipt"
+            data = {
+                "eventId": f"demo-receipt-{shipment_id}",
+                "occurredAt": manual_event_time(base, shipment_id, 10),
+                "recipientId": record["recipientId"],
+                "quantityReceived": record["quantity"],
+                "receiptReference": f"DEMO-{shipment_id}",
+            }
     else:
         action = {
             "3": "verify-loading",
@@ -230,12 +286,13 @@ def main():
                 "3 Verify loading         4 Dispatch (also use this to demonstrate a blocked attempt)"
             )
             print("5 Replenish 5 crates      6 Cancel a stock-waiting shipment")
-            print("7 Show activity history  8 Show product inventory  0 Exit")
+            print("7 Show activity history  8 Show product inventory")
+            print("9 Record manual arrival 10 Acknowledge receipt 0 Exit")
             choice = input("Action: ").strip()
             if choice == "0":
                 return 0
-            if choice not in "12345678" or len(choice) != 1:
-                print("Choose an action from 0 to 8.")
+            if choice not in {str(value) for value in range(1, 11)}:
+                print("Choose an action from 0 to 10.")
                 continue
             try:
                 perform(base, choice)

@@ -11,7 +11,7 @@ import json
 import sys
 import time
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from urllib.error import HTTPError
 from urllib.request import Request, urlopen
@@ -167,6 +167,9 @@ def main():
                 "ELEMENT_ACTIVATED",
             ),
         )
+        record = http(url)[1]
+        assert record["transportState"] == "IN_TRANSIT", record
+        assert record["vehicleReleased"] is False, record
         for field, expected in (("productId", "PRD-001"), ("batchId", "DEMO-MILK-001")):
 
             def exported_identity():
@@ -194,10 +197,137 @@ def main():
                 return status == 200 and result["hits"]["hits"]
 
             wait(f"P2 {field} exported", exported_identity)
+        return http(url)[1]
+
+    def assert_single_active_p2(sid, url, record):
+        event = next(
+            e
+            for e in http(url + "/events")[1]
+            if e["eventType"] == "ShipmentDispatched" and e["process"] == "P1"
+        )
+        asyncio.run(duplicate_dispatch(sid, event))
+        time.sleep(2)
+        status, result = http(
+            "http://localhost:9200/zeebe-record_variable*/_search",
+            {
+                "query": {
+                    "bool": {
+                        "filter": [
+                            {"term": {"value.name": "shipmentId"}},
+                            {"term": {"value.value": json.dumps(sid)}},
+                            {"term": {"value.bpmnProcessId": "ShipmentTransport"}},
+                        ]
+                    }
+                },
+                "size": 100,
+            },
+        )
+        assert status == 200, result
+        keys = {
+            str(h["_source"]["value"]["processInstanceKey"])
+            for h in result["hits"]["hits"]
+        }
+        assert keys == {record["p2ProcessInstanceKey"]}, keys
+        assert (
+            sum(
+                e["eventType"] == "TransportStarted"
+                for e in http(url + "/events")[1]
+            )
+            == 1
+        )
+
+    def complete_transport(sid, url, record, other=None):
+        p2_key = record["p2ProcessInstanceKey"]
+        timeline = datetime.now(timezone.utc).replace(microsecond=0)
+        arrival = {
+            "eventId": f"arrival-{run}-{sid}",
+            "occurredAt": (timeline + timedelta(minutes=5)).isoformat().replace("+00:00", "Z"),
+            "recipientId": record["recipientId"],
+        }
+        receipt = {
+            "eventId": f"receipt-{run}-{sid}",
+            "occurredAt": (timeline + timedelta(minutes=10)).isoformat().replace("+00:00", "Z"),
+            "recipientId": record["recipientId"],
+            "quantityReceived": record["quantity"],
+            "receiptReference": f"RCPT-{run}-{sid}",
+        }
+        assert http(url + "/acknowledge-receipt", receipt)[0] == 409
+        for _ in range(2):
+            assert http(url + "/arrive", arrival)[0] == 202
+        arrived = wait(
+            f"{sid} reaches receipt wait",
+            lambda: (
+                current
+                if (current := http(url)[1]).get("transportState") == "ARRIVED"
+                else None
+            ),
+        )
+        assert arrived["vehicleReleased"] is False, arrived
+        wait(
+            f"{sid} receipt catch activated",
+            lambda: engine_records(
+                p2_key, "WaitForReceiptAcknowledged", "ELEMENT_ACTIVATED"
+            ),
+        )
+        wait(
+            f"{sid} arrival catch completed",
+            lambda: engine_records(
+                p2_key, "WaitForShipmentArrived", "ELEMENT_COMPLETED"
+            ),
+        )
+        if other is not None:
+            other_url, other_key = other
+            other_record = http(other_url)[1]
+            assert other_record["transportState"] == "IN_TRANSIT", other_record
+            assert other_record["vehicleReleased"] is False, other_record
+            wait(
+                "independent shipment remains at arrival catch",
+                lambda: engine_records(
+                    other_key, "WaitForShipmentArrived", "ELEMENT_ACTIVATED"
+                ),
+            )
+        for _ in range(2):
+            assert http(url + "/acknowledge-receipt", receipt)[0] == 202
+        completed = wait(
+            f"{sid} transport completion and vehicle release",
+            lambda: (
+                current
+                if (current := http(url)[1]).get("transportState") == "COMPLETED"
+                and current.get("vehicleReleased") is True
+                else None
+            ),
+        )
+        wait(
+            f"{sid} P2 end event completion",
+            lambda: engine_records(p2_key, "TransportCompleted", "ELEMENT_COMPLETED"),
+        )
+        events = http(url + "/events")[1]
+        counts = {
+            name: sum(event["eventType"] == name for event in events)
+            for name in (
+                "ShipmentArrived",
+                "ReceiptAcknowledged",
+                "VehicleReleased",
+            )
+        }
+        assert counts == {
+            "ShipmentArrived": 1,
+            "ReceiptAcknowledged": 1,
+            "VehicleReleased": 1,
+        }, counts
+        return {
+            "shipmentId": sid,
+            "p2ProcessInstanceKey": p2_key,
+            "transportState": completed["transportState"],
+            "vehicleReleased": completed["vehicleReleased"],
+            "activityCounts": counts,
+            "events": [event for event in events if event["process"] == "P2"],
+        }
 
     first, first_url, _ = create(1, "V-01", 15)
     state(first_url, "AWAITING_LOADING")
-    finish(first_url)
+    first_record = finish(first_url)
+    assert_single_active_p2(first, first_url, first_record)
     cancelled, cancel_url, cancel_key = create(2, "V-02", 10)
     state(cancel_url, "WAITING_STOCK")
     wait(
@@ -242,8 +372,31 @@ def main():
     assert http(recovery_url + "/replenish-stock", payload)[0] == 202
     state(recovery_url, "AWAITING_LOADING")
     assert http(recovery_url + "/cancel", {"actor": "dispatcher-demo"})[0] == 409
-    finish(recovery_url)
+    recovery_record = finish(recovery_url)
+    assert_single_active_p2(recovered, recovery_url, recovery_record)
     assert milk_available() == 0
+    p2_evidence = []
+    p2_evidence.append(
+        complete_transport(
+            first,
+            first_url,
+            first_record,
+            other=(recovery_url, recovery_record["p2ProcessInstanceKey"]),
+        )
+    )
+    p2_evidence.append(complete_transport(recovered, recovery_url, recovery_record))
+
+    # Both vehicles have completed transport. Reusing V-01 for a new shipment
+    # must now succeed; milk is exhausted, so cancel its stock-waiting case.
+    reuse_id, reuse_url, reuse_key = create(4, "V-01", 10)
+    state(reuse_url, "WAITING_STOCK")
+    reuse_record = http(reuse_url)[1]
+    assert reuse_record["vehicleId"] == "V-01"
+    assert reuse_record["vehicleReleased"] is False
+    assert http(reuse_url + "/cancel", {"actor": "dispatcher-demo"})[0] == 202
+    state(reuse_url, "CANCELLED")
+    assert http(reuse_url)[1]["vehicleReleased"] is True
+
     assert http(base + "/stock")[1]["available"] == 80
     assert all(
         p["available"] == 20
@@ -261,38 +414,9 @@ def main():
             and e["payload"]["batchId"] == "DEMO-MILK-001"
             for e in logs[sid]
         )
-        if sid == cancelled:
+        if sid in {cancelled, reuse_id}:
             assert "p2ProcessInstanceKey" not in record
             continue
-        event = next(e for e in logs[sid] if e["eventType"] == "ShipmentDispatched")
-        asyncio.run(duplicate_dispatch(sid, event))
-        # Repeated handoffs must still map to the original P2 instance.
-        time.sleep(2)
-        status, result = http(
-            "http://localhost:9200/zeebe-record_variable*/_search",
-            {
-                "query": {
-                    "bool": {
-                        "filter": [
-                            {"term": {"value.name": "shipmentId"}},
-                            {"term": {"value.value": json.dumps(sid)}},
-                            {"term": {"value.bpmnProcessId": "ShipmentTransport"}},
-                        ]
-                    }
-                },
-                "size": 100,
-            },
-        )
-        assert status == 200, result
-        keys = {
-            str(h["_source"]["value"]["processInstanceKey"])
-            for h in result["hits"]["hits"]
-        }
-        assert keys == {record["p2ProcessInstanceKey"]}, keys
-        assert (
-            sum(e["eventType"] == "TransportStarted" for e in http(url + "/events")[1])
-            == 1
-        )
     results = {sid: replay(model, events) for sid, events in logs.items()}
     assert all(r["valid"] and r["accepting"] for r in results.values()), results
     invalid = json.loads((ROOT / "compliance/p1/invalid-trace.json").read_text())
@@ -353,19 +477,34 @@ def main():
             "product/batch identity exported to P2 and P1 activities",
             "other four products retain 20 crates each",
             "two dispatched P1 completions",
-            "two distinct P2 instances waiting",
+            "two distinct P2 instances completed only after receipt",
             "duplicate P2 start suppressed",
+            "early receipt rejected for both shipments",
+            "arrival and receipt exact retries recorded once",
+            "P2 reaches its end event and releases each vehicle",
+            "released vehicle can be reserved by a new shipment",
             "actual P1 logs conform and are accepting",
             "deliberately invalid trace rejected",
         ],
         processDoctor="Not run; import rules.xml and execution-log.xes for course-tool confirmation",
     )
     (args.output / "verification.json").write_text(json.dumps(report, indent=2) + "\n")
+    p2_report = dict(
+        observedAt=datetime.now(timezone.utc).isoformat(),
+        evidenceType="live Zeebe P2 execution using manual/test event endpoints",
+        datasetVersion=3,
+        cases=p2_evidence,
+        compliance="P2 DCR model/log verification is outstanding; this is execution evidence only.",
+    )
+    (args.output / "p2-completion.json").write_text(
+        json.dumps(p2_report, indent=2) + "\n"
+    )
     print(
-        "PASS: stock wait/recheck/cancellation, P2 handoff/deduplication, real engine states and P1 DCR replay"
+        "PASS: P1 stock wait/recheck/cancellation and DCR replay; two independent P2 completions, retries and vehicle reuse"
     )
     print(json.dumps(results, indent=2))
-    print("Evidence:", args.output)
+    print("P1 compliance evidence:", args.output / "execution-log.xes")
+    print("P2 execution evidence:", args.output / "p2-completion.json")
 
 
 if __name__ == "__main__":

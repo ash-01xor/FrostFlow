@@ -391,7 +391,9 @@ class Preparation(unittest.TestCase):
         )
 
         arrival = dict(
-            eventId="arrival-1",
+            # This deliberately collides with the internal P2 vehicle-release
+            # activity ID. External IDs must have their own journal namespace.
+            eventId="P2:S-test:VehicleReleased",
             eventType="ShipmentArrived",
             shipmentId="S-test",
             journeyId="J-test",
@@ -421,14 +423,16 @@ class Preparation(unittest.TestCase):
         )
         arrival_event = arrival_message["variables"]["arrivalEvent"]
         self.db.record_arrival("S-test", 999, arrival_event)
+        self.db.record_arrival("S-test", 999, arrival_event)
         record = self.db.get("S-test")
         self.assertEqual(record["transportState"], "ARRIVED")
         self.assertFalse(record["vehicleReleased"])
 
-        response = self.http.post(
-            "/shipments/S-test/acknowledge-receipt", json=receipt
-        )
-        self.assertEqual(response.status_code, 202, response.json)
+        for _ in range(2):
+            response = self.http.post(
+                "/shipments/S-test/acknowledge-receipt", json=receipt
+            )
+            self.assertEqual(response.status_code, 202, response.json)
         receipt_message = next(
             message
             for message in self.db.pending_messages()
@@ -440,11 +444,22 @@ class Preparation(unittest.TestCase):
         self.assertEqual(record["transportState"], "COMPLETED")
         self.assertTrue(record["vehicleReleased"])
         self.db.release_vehicle("S-test", 999, receipt_event)
+        events = self.db.events("S-test")
+        arrival_record = next(e for e in events if e["eventType"] == "ShipmentArrived")
         self.assertEqual(
-            sum(
-                event["eventType"] == "VehicleReleased"
-                for event in self.db.events("S-test")
-            ),
+            arrival_record["producerEventId"], "P2:S-test:VehicleReleased"
+        )
+        self.assertIn("P2:external:ShipmentArrived:S-test:", arrival_record["eventId"])
+        self.assertEqual(
+            sum(event["eventType"] == "ShipmentArrived" for event in events),
+            1,
+        )
+        self.assertEqual(
+            sum(event["eventType"] == "ReceiptAcknowledged" for event in events),
+            1,
+        )
+        self.assertEqual(
+            sum(event["eventType"] == "VehicleReleased" for event in events),
             1,
         )
         self.create(shipment="S-next", journey="J-next", vehicle="V-01")
