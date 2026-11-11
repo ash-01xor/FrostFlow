@@ -23,7 +23,7 @@ The [dataset reference](docs/RUNNING.md#demonstration-dataset) lists all product
 | Process | Execution platform | Status |
 | --- | --- | --- |
 | P1 — Shipment preparation | Camunda / Zeebe | Stock wait/cancellation, dispatch handoff and local compliance verification implemented |
-| P2 — Transport and delivery | Camunda / Zeebe | Manual completion flow implemented; GPS/ETA, risk decisions and live P3 notification remain |
+| P2 — Transport and delivery | Camunda / Zeebe | Manual flow implemented; full P2 in progress — see the [detailed handover](docs/COLD-CHAIN-INTEGRATION-AGREEMENT.md#p2-and-p3-development-handover) |
 | P3 — Receiving and stock admission | Camunda / Zeebe | Planned |
 | P4 — Quality incident investigation | DCR | Planned |
 | P5 — Corrective fulfilment | Camunda / Zeebe | Planned |
@@ -117,7 +117,7 @@ P4 will use DCR to **execute** the quality investigation. Its model will belong 
 
 ## Continuing with P2 and P3
 
-P2's manual-flow PR covers the `ShipmentDispatched` handoff through arrival, receipt acknowledgement, transport completion and vehicle release. The [P2/P3 handover](docs/COLD-CHAIN-INTEGRATION-AGREEMENT.md#p2-and-p3-development-handover) lists exact current contracts, worker entry points, manual-only inputs and remaining implementation checks.
+P2's manual flow is implemented from `ShipmentDispatched` through arrival, receipt acknowledgement, transport completion and vehicle release. Full P2 remains in progress. See the [P2/P3 handover](docs/COLD-CHAIN-INTEGRATION-AGREEMENT.md#p2-and-p3-development-handover) for current contracts, worker entry points, manual-only inputs and remaining implementation checks.
 
 **P1 owner: Ashvanth. P2 manual-flow owner: Rahul.** P3–P6 and simulator/CEP owners remain to be assigned. P3 has no executable receiving model or notification consumer; the P2 receipt input is manual/test only. Coordinate future shared Python and message-contract changes with the receiving owner and keep the handover/task board current. P2's full simulator and risk-decision scope is not complete.
 

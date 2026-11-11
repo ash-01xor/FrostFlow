@@ -336,6 +336,14 @@ npx --yes bpmn-to-image@0.10.0 bpmn/transport.bpmn:bpmn/transport.pdf
 
 Ordinary `docker compose stop` / `docker compose start` preserves the SQLite registry and named engine volumes. Existing P1 cases retain the BPMN version on which they started; there is no automatic engine-instance migration. The five-product service refuses to open a legacy pooled-stock registry. Old crates cannot be assigned truthful product/batch identities automatically. Preserve the old registry with its engine volumes; use a fresh matching project and registry directory. Existing evidence is not relabelled as five-product execution.
 
+For an existing P2 registry written before external event IDs were namespaced, a receipt ID such as `P2:<shipmentId>:VehicleReleased` may have occupied the journal key for the internal release activity. On a retry of that accepted receipt's release handler, the updated registry verifies and moves the legacy receipt entry, then restores the missing `VehicleReleased` activity in the same transaction. The upgrade regression check is:
+
+```powershell
+python -m unittest stage_tests.test_stage1.Preparation.test_upgrade_repairs_legacy_receipt_vehicle_release_collision -v
+```
+
+It should pass and leave exactly one `ReceiptAcknowledged` and one `VehicleReleased` activity. It tests the stored-registry repair; it does not run the engine or alter a live dataset.
+
 To verify changes without replacing existing demo data, first stop the current stack, then select a fresh project name and registry directory. Find the active name with `docker compose ls`; replace `CURRENT_PROJECT` below with that name:
 
 ```bash

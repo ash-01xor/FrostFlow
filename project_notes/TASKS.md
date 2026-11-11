@@ -5,7 +5,7 @@
 | Work | Owner | Status | Main dependency |
 | --- | --- | --- | --- |
 | P1 Shipment preparation | Ashvanth | IMPLEMENTED; engine and external conformance verified | Teammate review |
-| P2 Transport and delivery | Rahul | MANUAL FLOW IMPLEMENTED / VERIFY; full P2 remains in progress | P3 notification contract, simulator, ETA and risk decisions |
+| P2 Transport and delivery | Rahul | MANUAL FLOW IMPLEMENTED; full P2 IN PROGRESS | [Detailed handover](../docs/COLD-CHAIN-INTEGRATION-AGREEMENT.md#p2-and-p3-development-handover); P3 contract, simulator, ETA and risk decisions |
 | P3 Receiving and admission | Unassigned | TODO | P2 arrival + P4 shared hold |
 | P4 Quality investigation (DCR) | Unassigned | TODO | DCR access + incident integration |
 | P5 Corrective fulfilment | Unassigned | TODO | P4 authorised disposition + P1–P3 |
@@ -62,7 +62,9 @@ The catalogue and scope assumptions are documented in [the run guide](../docs/RU
 - [x] Add manual/test arrival and receipt endpoints, transactional states/activities, exact retries and vehicle-release gating.
 - [x] Extend the CLI for manual arrival/receipt, state-aware Operate hints and polling to `ARRIVED`/`COMPLETED`.
 - [x] Add a regression for external event IDs colliding with internal activity IDs.
-- [ ] Run `stage_tests/check_stage1.py` on fresh data; preserve separate P1 compliance and P2 execution evidence.
+- [x] Run the 33-test offline suite at tested commit `720ed5109fc26ec5b128f87010d01b62bc9628e4`; command: `python -m unittest discover -s stage_tests -p 'test_*.py' -v`.
+- [x] Run `stage_tests/check_stage1.py` on a fresh version-3 dataset and verify two P2 completions, receipt gating, retries, Zeebe end events and vehicle reuse. P1 compliance artifacts: `runtime/verification-results/execution-log.xes` and `verification.json`; P2 execution evidence: `runtime/verification-results/p2-completion.json`. This live report is from the manual-flow validation run; the later legacy-collision repair is covered by the offline regression at tested commit `720ed5109fc26ec5b128f87010d01b62bc9628e4`. Runtime evidence is local/ignored; P2 JSON is not DCR conformance evidence.
+- [x] Manually observe the CLI/Operate flow through `WaitForReceiptAcknowledged`, `TransportCompleted` and vehicle release.
 - [ ] Add the durable P2-arrival-to-P3 notification after agreeing its contract with the P3 owner.
 - [ ] Produce scripted GPS; fetch fresh traffic-aware TomTom ETA for remaining route.
 - [ ] Handle `DeliveryRiskDetected` with an explicit, deduplicated dispatcher decision.
@@ -70,6 +72,8 @@ The catalogue and scope assumptions are documented in [the run guide](../docs/RU
 - [ ] Add dispatcher CLI controls for risk decisions and route changes.
 - [ ] Deliver P2 DCR rules and a real execution log; verify conformance separately from P1.
 - [ ] Verify full P2 integrations: automatic arrival, risk handling, route change acknowledgement and independent journeys.
+
+Follow-up PR/issue links and owners have not been agreed yet. Add the links and named owners here once the team assigns them; keep P3 notification, GPS/automatic arrival, TomTom ETA, risk decisions, acknowledged route changes, dispatcher CLI controls and P2 DCR verification as separate deliverables. See the [file-by-file handover](../docs/COLD-CHAIN-INTEGRATION-AGREEMENT.md#full-p2-work-still-outstanding).
 
 ## P3 — Receiving and stock admission
 
