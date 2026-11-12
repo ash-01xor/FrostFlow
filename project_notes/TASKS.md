@@ -74,14 +74,14 @@ The catalogue and scope assumptions are documented in [the run guide](../docs/RU
 - [ ] Agree the P3 receiver envelope/idempotency response with its owner; verify retries start P3 once against the real receiver.
 - [ ] Verify automatic arrival and route updates for two independent shipments in Operate.
 - [ ] Verify a TomTom ETA request with the team's API key and record its source/response.
-- [ ] Verify Siddhi receives telemetry and emits a shipment-correlated risk alert.
-- [ ] Verify an approved route command reaches the simulator through Siddhi, receives acknowledgement, then changes GPS/ETA.
+- [ ] Live-verify local Siddhi receives telemetry and emits one shipment-correlated risk alert from an ETA past the deadline; follow [the short-deadline walkthrough](../docs/RUNNING.md#live-siddhi-risk-and-route-command-walkthrough).
+- [ ] Live-verify an approved route command passes through Siddhi to the local scripted simulator, receives acknowledgement, then changes GPS/ETA; a physical/external simulator remains a separate integration.
 - [ ] Rehearse the risk/decision/route controls from the CLI against the live stack.
 - [ ] Rerun the expanded 35-test offline suite under Python 3.12; the current local Python 3.10 runtime lacks `grpc`.
 - [ ] Deliver P2 DCR rules and a real execution log; verify conformance separately from P1.
 - [ ] Run the final live P2 acceptance with both independent journeys, automatic arrival, dispatcher outcomes, external notifications and receipt-gated release.
 
-External P3/Siddhi/TomTom service owners and follow-up PR/issue links have not been agreed yet. Add names and links after team review. The code is implemented behind configurable endpoints; live acceptance and P2 DCR remain outstanding. See the [file-by-file handover](../docs/COLD-CHAIN-INTEGRATION-AGREEMENT.md#p2-and-p3-development-handover).
+The local Siddhi app now consumes durable GPS/ETA telemetry, emits deduplicated late-ETA alerts, and forwards route commands to the local scripted simulator for acknowledgement. The walkthrough and acceptance checks are in [the run guide](../docs/RUNNING.md#live-siddhi-risk-and-route-command-walkthrough). Live acceptance, the P3 receiver contract/delivery, external simulator/TomTom verification, and P2 DCR remain outstanding. External service owners and follow-up PR/issue links have not been agreed yet; record names and links after team review. See the [file-by-file handover](../docs/COLD-CHAIN-INTEGRATION-AGREEMENT.md#p2-and-p3-development-handover).
 
 ## P3 — Receiving and stock admission
 

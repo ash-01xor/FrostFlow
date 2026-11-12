@@ -180,7 +180,7 @@ def inventory(base):
     return stock
 
 
-def perform(base, choice):
+def perform(base, choice, deadline_minutes=60):
     if choice == "8":
         inventory(base)
         return
@@ -207,7 +207,9 @@ def perform(base, choice):
         product = stock["products"][int(selected) - 1]
         action = "create"
         path = "/shipments"
-        deadline = (datetime.now(timezone.utc) + timedelta(hours=1)).isoformat()
+        deadline = (
+            datetime.now(timezone.utc) + timedelta(minutes=deadline_minutes)
+        ).isoformat()
         data = dict(
             shipmentId=shipment_id,
             journeyId="journey-" + shipment_id,
@@ -328,11 +330,17 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--base-url", default="http://localhost:5001")
     parser.add_argument(
+        "--deadline-minutes", type=int, default=60,
+        help="delivery deadline offset for new demo shipments (short values trigger Siddhi risk)",
+    )
+    parser.add_argument(
         "--check",
         action="store_true",
         help="Check readiness and inventory without changing data",
     )
     args = parser.parse_args()
+    if args.deadline_minutes <= 0:
+        parser.error("--deadline-minutes must be greater than zero")
     base = args.base_url.rstrip("/")
     try:
         status, health = http(base, "/health")
@@ -368,7 +376,7 @@ def main():
                 print("Choose an action from 0 to 13.")
                 continue
             try:
-                perform(base, choice)
+                perform(base, choice, args.deadline_minutes)
             except (ValueError, RuntimeError) as error:
                 print("Cannot perform action:", error)
     except (URLError, TimeoutError, OSError, RuntimeError) as error:

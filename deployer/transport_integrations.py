@@ -78,7 +78,11 @@ class TransportIntegrations:
         if not url:
             return {"commandId": command["commandId"], "simulatorAcknowledged": True,
                     "mode": "local-demo"}
-        result = post_json(url, command, {"Idempotency-Key": command["commandId"]}, timeout=15)
+        result = post_json(
+            url, {"event": command},
+            {"Idempotency-Key": command["commandId"]}, timeout=15,
+        )
+        result = result.get("event", result)
         if result.get("commandId") != command["commandId"] or result.get("simulatorAcknowledged") is not True:
             raise RuntimeError("Siddhi did not return a matching simulator acknowledgement")
         return result

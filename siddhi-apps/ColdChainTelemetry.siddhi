@@ -1,25 +1,172 @@
 @App:name("ColdChainTelemetry")
 
+/*
+ * Telemetry arrives from the durable P2 outbox as {"event": { ... }}.
+ * ETAUpdated events past the deadline produce one alert per route revision.
+ * Dispatcher commands are handled synchronously so P2 only applies a route
+ * after the scripted simulator receiver has acknowledged the same commandId.
+ */
+
 @source(type='http',
         receiver.url='http://0.0.0.0:8006/telemetry',
-        @map(type='json'))
+        @map(type='json', @attributes(
+            eventId='$.event.eventId',
+            eventType='$.event.eventType',
+            shipmentId='$.event.shipmentId',
+            journeyId='$.event.journeyId',
+            occurredAt='$.event.occurredAt',
+            eta='$.event.payload.eta',
+            deliveryDeadline='$.event.payload.deliveryDeadline',
+            etaMillis='$.event.payload.etaMillis',
+            deliveryDeadlineMillis='$.event.payload.deliveryDeadlineMillis',
+            routeId='$.event.payload.routeId',
+            routeRevision='$.event.payload.routeRevision'
+        )))
 define stream TransportTelemetryStream (
     eventId string,
     eventType string,
     shipmentId string,
     journeyId string,
-    occurredAt string
+    occurredAt string,
+    eta string,
+    deliveryDeadline string,
+    etaMillis long,
+    deliveryDeadlineMillis long,
+    routeId string,
+    routeRevision int
 );
 
-@sink(type='log', prefix='COLD-CHAIN')
+@sink(type='log', prefix='COLD-CHAIN-TELEMETRY')
 define stream TransportLogStream (
     eventId string,
     eventType string,
     shipmentId string,
     journeyId string,
-    occurredAt string
+    occurredAt string,
+    eta string,
+    routeId string
 );
 
 from TransportTelemetryStream
-select eventId, eventType, shipmentId, journeyId, occurredAt
+select eventId, eventType, shipmentId, journeyId, occurredAt, eta, routeId
 insert into TransportLogStream;
+
+@sink(type='http', publisher.url='http://communication:5001/integrations/siddhi/delivery-risk',
+      method='POST', @map(type='json'))
+define stream DeliveryRiskOutStream (
+    shipmentId string,
+    eventId string,
+    occurredAt string,
+    eta string,
+    deliveryDeadline string,
+    reason string,
+    estimatedDelaySeconds long
+);
+
+@sink(type='log', prefix='COLD-CHAIN-RISK')
+define stream DeliveryRiskLogStream (
+    shipmentId string,
+    eventId string,
+    occurredAt string,
+    eta string,
+    deliveryDeadline string,
+    reason string,
+    estimatedDelaySeconds long
+);
+
+define stream DeliveryRiskStream (
+    shipmentId string,
+    eventId string,
+    occurredAt string,
+    eta string,
+    deliveryDeadline string,
+    reason string,
+    estimatedDelaySeconds long
+);
+
+from TransportTelemetryStream[ eventType == 'ETAUpdated' and
+                              etaMillis > deliveryDeadlineMillis ]
+#window.unique:first(str:concat(shipmentId, ':', journeyId, ':', routeRevision))
+select shipmentId,
+       str:concat('SIDDHI:RISK:', eventId) as eventId,
+       occurredAt,
+       eta,
+       deliveryDeadline,
+       'ETA exceeds delivery deadline' as reason,
+       math:round((etaMillis - deliveryDeadlineMillis) / 1000.0) as estimatedDelaySeconds
+insert into DeliveryRiskStream;
+
+from DeliveryRiskStream
+select shipmentId, eventId, occurredAt, eta, deliveryDeadline, reason, estimatedDelaySeconds
+insert into DeliveryRiskOutStream;
+
+from DeliveryRiskStream
+select shipmentId, eventId, occurredAt, eta, deliveryDeadline, reason, estimatedDelaySeconds
+insert into DeliveryRiskLogStream;
+
+/*
+ * A decision worker POSTs to /route-command and waits for the matching
+ * http-service-response. The forwarding sink receives the simulator's JSON
+ * acknowledgement and returns it to that original HTTP request.
+ */
+@source(type='http-service', receiver.url='http://0.0.0.0:8006/route-command',
+        source.id='route-command', @map(type='json', @attributes(
+            messageId='trp:messageId',
+            commandId='$.event.commandId',
+            shipmentId='$.event.shipmentId',
+            journeyId='$.event.journeyId',
+            riskEventId='$.event.riskEventId',
+            command='$.event.command',
+            routeId='$.event.routeId'
+        )))
+define stream RouteCommandStream (
+    messageId string,
+    commandId string,
+    shipmentId string,
+    journeyId string,
+    riskEventId string,
+    command string,
+    routeId string
+);
+
+@sink(type='http-call', sink.id='simulator-command',
+      publisher.url='http://communication:5001/integrations/simulator/route-command',
+      method='POST', @map(type='json'))
+define stream SimulatorCommandOutStream (
+    messageId string,
+    commandId string,
+    shipmentId string,
+    journeyId string,
+    riskEventId string,
+    command string,
+    routeId string
+);
+
+from RouteCommandStream
+select messageId, commandId, shipmentId, journeyId, riskEventId, command, routeId
+insert into SimulatorCommandOutStream;
+
+@source(type='http-call-response', sink.id='simulator-command', http.status.code='2.*',
+        @map(type='json', @attributes(
+            messageId='trp:messageId',
+            commandId='trp:commandId',
+            simulatorAcknowledged='$.simulatorAcknowledged'
+        )))
+define stream SimulatorCommandAckStream (
+    messageId string,
+    commandId string,
+    simulatorAcknowledged bool
+);
+
+@sink(type='http-service-response', source.id='route-command',
+      message.id='{{messageId}}',
+      @map(type='json'))
+define stream RouteCommandResponseStream (
+    messageId string,
+    commandId string,
+    simulatorAcknowledged bool
+);
+
+from SimulatorCommandAckStream
+select messageId, commandId, simulatorAcknowledged
+insert into RouteCommandResponseStream;

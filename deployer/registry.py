@@ -15,6 +15,11 @@ def now():
     return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
 
 
+def epoch_milliseconds(value):
+    parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    return int(parsed.timestamp() * 1000)
+
+
 class Conflict(Exception):
     pass
 
@@ -785,7 +790,15 @@ class Registry:
             eta_event = self.event(
                 db, record, "ETAUpdated", process="P2",
                 event_id=f"P2:{shipment_id}:ETAUpdated:{revision}:{route_index}",
-                payload={"eta": eta, "etaSource": eta_source, "routeId": record["routeId"]},
+                payload={
+                    "eta": eta,
+                    "etaSource": eta_source,
+                    "etaMillis": epoch_milliseconds(eta),
+                    "deliveryDeadline": record["deliveryDeadline"],
+                    "deliveryDeadlineMillis": epoch_milliseconds(record["deliveryDeadline"]),
+                    "routeId": record["routeId"],
+                    "routeRevision": revision,
+                },
             )
             self.enqueue(db, eta_event["eventId"], "TelemetryUpdate", shipment_id,
                          {"event": eta_event}, destination="siddhi-http")
@@ -927,6 +940,44 @@ class Registry:
                 )
             self.save(db, record)
             return record
+
+    def acknowledge_simulator_command(self, command):
+        """Durably accept one route command for the local scripted simulator."""
+        with self.transaction() as db:
+            record = self.read(db, command["shipmentId"])
+            identity = f"simulator-command:{command['commandId']}"
+            old = db.execute("SELECT data FROM results WHERE id=?", (identity,)).fetchone()
+            if old:
+                accepted = json.loads(old[0])
+                if accepted["command"] != command:
+                    raise Conflict("commandId was already used with different command data")
+                return accepted["acknowledgement"]
+            if record.get("transportState") != "IN_TRANSIT":
+                raise Conflict("simulator route command requires an in-transit shipment")
+            if record.get("journeyId") != command["journeyId"]:
+                raise Conflict("journeyId does not match the shipment")
+            if record.get("pendingDeliveryRisk") != command["riskEventId"]:
+                raise Conflict("route command does not match the pending risk decision")
+            if command["command"] == "ChangeRoute":
+                if command.get("routeId") not in ("route-01", "route-02", "route-03"):
+                    raise ValueError("routeId must name a configured route")
+                if command["routeId"] == record.get("routeId"):
+                    raise Conflict("route command must select a different route")
+            elif command["command"] == "AcceptDelay":
+                if command.get("routeId") is not None:
+                    raise ValueError("AcceptDelay must not include routeId")
+            else:
+                raise ValueError("command must be AcceptDelay or ChangeRoute")
+            acknowledgement = {
+                "commandId": command["commandId"],
+                "simulatorAcknowledged": True,
+                "simulator": "scripted-demo",
+            }
+            db.execute(
+                "INSERT INTO results VALUES (?,?)",
+                (identity, json.dumps({"command": command, "acknowledgement": acknowledgement})),
+            )
+            return acknowledgement
 
     def record_arrival(self, shipment_id, key, arrival_event):
         with self.transaction() as db:

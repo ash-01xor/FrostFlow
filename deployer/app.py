@@ -303,7 +303,10 @@ def manual_arrival(shipment_id):
 @app.post("/integrations/siddhi/delivery-risk")
 def siddhi_delivery_risk():
     """Receive a Siddhi alert, with eventId as the idempotency key."""
-    data = body()
+    envelope = body()
+    data = envelope.get("event", envelope)
+    if not isinstance(data, dict):
+        raise ValueError("event must be an object")
     shipment_id = text_field(data, "shipmentId")
     event_id = text_field(data, "eventId")
     occurred_at = utc_timestamp(data, "occurredAt")
@@ -321,6 +324,26 @@ def siddhi_delivery_risk():
     accepted = registry.queue_delivery_risk(shipment_id, event_id, payload)
     return jsonify(status="accepted", shipmentId=shipment_id, eventId=event_id,
                    messageId=accepted["messageId"]), 202
+
+
+@app.post("/integrations/simulator/route-command")
+def simulator_route_command():
+    """Local scripted simulator receiver used by Siddhi's command bridge."""
+    envelope = body()
+    data = envelope.get("event", envelope)
+    if not isinstance(data, dict):
+        raise ValueError("event must be an object")
+    command = {
+        "commandId": text_field(data, "commandId"),
+        "shipmentId": text_field(data, "shipmentId"),
+        "journeyId": text_field(data, "journeyId"),
+        "riskEventId": text_field(data, "riskEventId"),
+        "command": text_field(data, "command"),
+        "routeId": data.get("routeId"),
+    }
+    if command["routeId"] is not None and not isinstance(command["routeId"], str):
+        raise ValueError("routeId must be a string")
+    return jsonify(registry.acknowledge_simulator_command(command)), 200
 
 
 @app.post("/shipments/<shipment_id>/dispatcher-decision")

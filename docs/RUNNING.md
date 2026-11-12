@@ -353,6 +353,24 @@ docker compose up --build -d communication
 
 It runs the stock-wait/cancellation/replenishment P1 scenarios, completes two independent P2 transports through the manual endpoints, and verifies the P2 end events, exact retry counts, early-receipt rejection and reuse of a released vehicle. It requires a fresh version-3 dataset with all 100 crates and both vehicles available. It writes P1 compliance artifacts to `runtime/verification-results/execution-log.xes` and `verification.json`; the XES contains P1 activities only. Separate P2 execution evidence is written to `runtime/verification-results/p2-completion.json`. That P2 report is not DCR conformance evidence; a P2 DCR model/log has not yet been delivered. For a separate automatic-arrival demo, keep the default `P2_SIMULATOR_ENABLED=true` and watch `currentPosition`, `eta`, and the `WaitForShipmentArrived` catch in Operate before acknowledging receipt.
 
+### Live Siddhi risk and route-command walkthrough
+
+The local Siddhi app consumes the telemetry outbox, logs telemetry, and sends one `DeliveryRiskDetected` alert for the first late ETA in each shipment/journey/route revision. The service is not an external vehicle simulator: Siddhi forwards a decision command to the communication service's idempotent scripted-simulator endpoint, which acknowledges it before P2 changes route. The Compose defaults connect both telemetry and commands to the local Siddhi service. `/health` should report `siddhiTelemetry: "enabled"` and `siddhiCommands: "enabled"`.
+
+Use a fresh demo dataset for a clear run. Set a slower GPS tick before starting the stack, then create a shipment whose deadline is short enough for its route ETA to exceed it:
+
+```powershell
+$env:GPS_TICK_SECONDS = "15"
+$env:P2_SIMULATOR_ENABLED = "true"
+docker compose up --build -d --wait --wait-timeout 180
+Invoke-RestMethod http://localhost:5001/health | ConvertTo-Json -Depth 5
+python tools/demo.py --deadline-minutes 1
+```
+
+In the CLI, create a shipment with **1**, verify loading with **3**, then dispatch with **4**. Use **2** to poll the shipment. After the first late ETA reaches Siddhi, its `COLD-CHAIN-RISK` log and P2 `DeliveryRiskDetected` activity should appear, and the instance should wait at the dispatcher decision. Choose **13** and select a route different from the current route. A successful decision records the simulator acknowledgement before updating `routeId`; later position and ETA updates should use that route. In Operate, confirm P2 still waits for receipt after automatic arrival, then use **10** to acknowledge receipt and confirm completion and vehicle release. `docker compose logs -f siddhi` shows telemetry and risk events; `docker compose logs -f communication` shows message delivery and worker errors.
+
+Option **11** remains a manual test alert and bypasses Siddhi's risk detection; do not use it for this walkthrough. A local route-command acknowledgement verifies the Siddhi-to-scripted-simulator path only. It does not prove integration with a physical/external simulator. P3 delivery and P2 DCR evidence remain separate outstanding work.
+
 The reviewed five-product [execution log](../compliance/p1/execution-log.xes) and [verification report](../compliance/p1/verification.json) contain actual execution evidence and source/model hashes from this checkpoint. Regenerate and review them when implementation or models change. The report also records successful ProcessDoctor import/conformance and the metadata-only model correction. Repeat external conformance checking when the rules or log change. P1 ownership is recorded in the project documentation. The BPMN source and PDF omit student attribution at the owner's request. The DCR display title includes the owner; its semantics are unchanged and the report preserves the hashes used in the original checks. Model PDFs can be exported in Modeler or with [bpmn-to-image](https://github.com/bpmn-io/bpmn-to-image):
 
 ```bash
