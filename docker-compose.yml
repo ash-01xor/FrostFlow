@@ -9,6 +9,12 @@ services:
       BPMN_FILE: /bpmn/shipment_preparation.bpmn
       P2_BPMN_FILE: /bpmn/transport.bpmn
       REGISTRY_PATH: /data/registry.sqlite
+      GPS_TICK_SECONDS: ${GPS_TICK_SECONDS:-5}
+      P2_SIMULATOR_ENABLED: ${P2_SIMULATOR_ENABLED:-true}
+      TOMTOM_API_KEY: ${TOMTOM_API_KEY:-}
+      SIDDIHI_TELEMETRY_URL: ${SIDDIHI_TELEMETRY_URL:-http://siddhi:8006/telemetry}
+      SIDDIHI_COMMAND_URL: ${SIDDIHI_COMMAND_URL:-}
+      P3_ARRIVAL_URL: ${P3_ARRIVAL_URL:-}
     volumes:
       - ./bpmn:/bpmn:ro
       - ${REGISTRY_DIR:-./runtime}:/data
@@ -54,6 +60,14 @@ services:
       timeout: 5s
       retries: 30
       start_period: 20s
+
+  siddhi:
+    image: siddhiio/siddhi-runner-alpine:latest
+    ports:
+      - "127.0.0.1:8006:8006"
+    volumes:
+      - ./siddhi-apps:/apps:ro
+    command: ["-Dapps=/apps/ColdChainTelemetry.siddhi"]
 
   operate:
     image: camunda/operate:8.8.0

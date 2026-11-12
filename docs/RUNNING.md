@@ -1,6 +1,6 @@
 # Running, testing and understanding P1
 
-Run commands from the repository root. P1 responsible student: **Ashvanth**. The implemented scope includes shipment preparation, a P2 transport workflow exercised through manual arrival/receipt inputs, and the P1 stock shortage/cancellation paths.
+Run commands from the repository root. P1 responsible student: **Ashvanth**. The implemented scope includes shipment preparation, scripted P2 GPS/ETA and dispatcher decisions, automatic arrival, manual receipt acknowledgement, and the P1 stock shortage/cancellation paths. External Siddhi and P3 contracts still need team verification.
 
 ## Demonstration dataset
 
@@ -33,7 +33,24 @@ docker compose up --build -d --wait --wait-timeout 180
 curl -s http://localhost:5001/health
 ```
 
-Wait for `status: ready` and `stage: 2`. Both BPMN resources must deploy before readiness. Operate is at <http://localhost:8081> (`demo` / `demo`). Open [P1](../bpmn/shipment_preparation.bpmn) in Camunda Modeler alongside its [PDF](../bpmn/shipment_preparation.pdf). The [P2 model](../bpmn/transport.bpmn) and [PDF](../bpmn/transport.pdf) show the receiving boundary.
+Wait for `status: ready` and `stage: 2`. Both BPMN resources must deploy before readiness. Operate is at <http://localhost:8081> (`demo` / `demo`). Open [P1](../bpmn/shipment_preparation.bpmn) in Camunda Modeler alongside its [PDF](../bpmn/shipment_preparation.pdf). Open the updated [P2 model](../bpmn/transport.bpmn) in Modeler; regenerate `bpmn/transport.pdf` after editing it using the export command under Automated verification.
+
+### P2 integration settings
+
+The default stack runs the scripted route with a local ETA estimate and a local simulated route-command acknowledgement. `/health` reports these modes. `P2_SIMULATOR_ENABLED` defaults to `true`; set it to `false` only when running the legacy live check that drives arrival through the manual endpoint. To connect real integrations, set these variables in PowerShell before `docker compose up`:
+
+```powershell
+$env:TOMTOM_API_KEY = "<TomTom key>"
+$env:SIDDIHI_TELEMETRY_URL = "http://<siddhi-host>:<port>/<telemetry-path>"
+$env:SIDDIHI_COMMAND_URL = "http://<siddhi-host>:<port>/<command-path>"
+$env:P3_ARRIVAL_URL = "http://<p3-host>:<port>/<arrival-path>"
+$env:GPS_TICK_SECONDS = "5"
+$env:P2_SIMULATOR_ENABLED = "true"
+docker compose up --build -d --wait --wait-timeout 180
+Invoke-RestMethod http://localhost:5001/health
+```
+
+The communication container must be able to reach the configured hostnames. Siddhi telemetry is sent as `{"event": <activity>}` with an `Idempotency-Key` header. The command endpoint receives `commandId`, `shipmentId`, `journeyId`, `riskEventId`, `command`, and `routeId`; it must return the same `commandId` and `simulatorAcknowledged: true` only after the simulator applies the command. The P3 endpoint receives `{"event": <arrival notification>}` with a stable `deliveryId` and the same idempotency header. It must deduplicate that ID and return 2xx after accepting it. Confirm these payloads and endpoint behavior with the Siddhi/P3 owners before relying on live delivery; unconfigured P3 notifications remain pending in SQLite.
 
 Published localhost ports: Python 5001, Operate 8081, Elasticsearch 9200, Zeebe gRPC 26501 and broker management 9601. Stop another stack using these ports before starting this one. For startup problems:
 
@@ -52,7 +69,7 @@ After starting a fresh stack, run:
 python tools/demo.py
 ```
 
-This terminal menu sends the same application requests as the commands below. It waits for state changes and prints P1/P2 instance keys to find in Operate. Choose an action number, then shipment **A**, **B** or **C**. Creation also offers a choice of all five products; press Enter to use milk for the shortage scenario. Actions **9** and **10** submit the manual arrival and receipt events. Arrival polls until `ARRIVED` while the vehicle remains reserved; receipt polls until `COMPLETED` with `vehicleReleased: true`. Stable event IDs and timestamps make retrying the same menu action an exact retry. `python tools/demo.py --check` checks readiness and stock without changing data.
+This terminal menu sends the same application requests as the commands below. It waits for state changes and prints P1/P2 instance keys to find in Operate. Choose an action number, then shipment **A**, **B** or **C**. Creation also offers a choice of all five products; press Enter to use milk for the shortage scenario. After dispatch, the scripted route updates position/ETA and sends arrival automatically after about 20 seconds at the default five-second cadence; wait a few ticks before selecting receipt. Action **9** is an optional manual/test arrival. Action **11** creates a test risk alert; **12** accepts the delay and **13** approves a different route. Action **10** submits the manual receipt event and polls until `COMPLETED` with `vehicleReleased: true`. `python tools/demo.py --check` checks readiness and stock without changing data.
 
 For the normal P1 demonstration:
 
@@ -61,8 +78,9 @@ For the normal P1 demonstration:
 | 1, then A | Create 15-crate milk order (product 1); reserve stock and await loading | Find P1's printed key in Operate; it is waiting for a warehouse confirmation |
 | 4, then A | Dispatch is rejected | Loading verification is required |
 | 3, then A | Confirm the simulated loading checks | P1 moves to the dispatch-approval wait |
-| 4, then A | Dispatch; register P2 | P1 completes; P2 starts the journey and waits at `WaitForShipmentArrived` |
-| 9, then A | Submit manual/test arrival | P2 records arrival, remains active at `WaitForReceiptAcknowledged`, and keeps V-01 reserved |
+| 4, then A | Dispatch; register P2 | P1 completes; P2 starts the scripted journey and records position/ETA updates |
+| wait, then 10, then A | Allow automatic arrival, then acknowledge receipt | P2 moves through `WaitForShipmentArrived` to `WaitForReceiptAcknowledged`; V-01 stays reserved until receipt |
+| 11, then A; 12 or 13, then A | Exercise risk and dispatcher decisions during transit | For route approval, choose a route different from the current route and check the acknowledgement and subsequent route movement |
 | 10, then A | Submit manual/test receipt acknowledgement | P2 reaches `TransportCompleted`; registry shows `COMPLETED` and releases V-01 |
 
 For a stock exception, choose **1, B**, then milk again: 10 milk crates are requested while only five milk crates remain. The other four products still have 20 crates each; they cannot satisfy this order. Show the stock-wait gateway, then choose either **5, B** to replenish five milk crates and continue preparation, or **6, B** to cancel. After cancelling B, **1, C** creates another stock-wait case on the released vehicle if you want to rehearse the other branch. Menu **2** displays state/keys; **7** displays the activity history; **8** lists product/batch stock; **0** exits without stopping the stack.
@@ -214,7 +232,7 @@ $record | Format-List shipmentId,transportState,vehicleReleased
 
 In Operate, confirm `ReleaseVehicle` completes and the process reaches `TransportCompleted`.
 
-Both endpoints accept manual/test inputs only. `ShipmentArrived` and `ReceiptAcknowledged` correlate by `shipmentId`; the receipt endpoint stands in for P3 and does not send a P3 notification. Retrying the exact same event ID and payload returns **202** and does not duplicate journal activities. Reusing an event ID with different content, or submitting an event in the wrong state, returns **409**. A new live check below exercises two shipments independently, their early-receipt rejection, exact retries, engine completion and vehicle reuse. P2 DCR model/log verification remains outstanding; the live JSON report is execution evidence only. The GPS simulator and live P3 connection remain follow-up work. Damaged-packaging handling is outside this increment: all loading checks must be true for verification.
+The `/arrive` and `/acknowledge-receipt` endpoints remain manual/test inputs; the simulator now publishes its own arrival event. Both correlate by `shipmentId`. On arrival, P2 writes a separate durable `ShipmentArrivalNotification` to its outbox; it is sent only when `P3_ARRIVAL_URL` is configured. The proposed HTTP envelope is not yet an agreed P3 contract. Exact event retries reuse one message/activity; changed content and wrong-state requests return **409**. The committed live completion check still covers the manual receipt flow; run the route/risk checks separately and verify their Operate events. P2 DCR model/log verification remains outstanding. Damaged-packaging handling is outside this increment: all loading checks must be true for verification.
 
 ## What the BPMN and Python each do
 
@@ -315,7 +333,7 @@ npx --yes @camunda8/cli@4.6.1 bpmn lint bpmn/shipment_preparation.bpmn
 npx --yes @camunda8/cli@4.6.1 bpmn lint bpmn/transport.bpmn
 ```
 
-The offline suite contains **33 tests** covering five-product seed data, product/batch validation, isolated inventory, concurrent reservation, targeted supply, restart persistence, legacy-data protection, XES traceability, retry identities, cancellation, outbox handling, P2 state guards, CLI event routing, legacy P2 upgrade repair and DCR replay. They stub engine calls; they do not replace the live P2 completion check below.
+The offline suite currently defines **35 tests**, including route telemetry and dispatcher decision regressions. The last recorded run at the manual-flow checkpoint had 33 passing tests; rerun the expanded suite in Python 3.12 with the project dependencies installed. The tests stub engine calls and external services; they do not replace a live TomTom/Siddhi/P3 run or the P2 DCR verification.
 
 Against a fresh, healthy stack:
 
@@ -323,13 +341,23 @@ Against a fresh, healthy stack:
 .venv/bin/python stage_tests/check_stage1.py
 ```
 
-This runs the stock-wait/cancellation/replenishment P1 scenarios, completes two independent P2 transports through the manual endpoints, and verifies the P2 end events, exact retry counts, early-receipt rejection and reuse of a released vehicle. It requires a fresh version-3 dataset with all 100 crates and both vehicles available. It writes P1 compliance artifacts to `runtime/verification-results/execution-log.xes` and `verification.json`; the XES contains P1 activities only. Separate P2 execution evidence is written to `runtime/verification-results/p2-completion.json`. That P2 report is not DCR conformance evidence; a P2 DCR model/log has not yet been delivered.
+This legacy check drives arrival and receipt manually. On a fresh stack, disable the background route before running it, then restore the default afterward:
+
+```powershell
+$env:P2_SIMULATOR_ENABLED = "false"
+docker compose up --build -d communication
+python stage_tests/check_stage1.py
+$env:P2_SIMULATOR_ENABLED = "true"
+docker compose up --build -d communication
+```
+
+It runs the stock-wait/cancellation/replenishment P1 scenarios, completes two independent P2 transports through the manual endpoints, and verifies the P2 end events, exact retry counts, early-receipt rejection and reuse of a released vehicle. It requires a fresh version-3 dataset with all 100 crates and both vehicles available. It writes P1 compliance artifacts to `runtime/verification-results/execution-log.xes` and `verification.json`; the XES contains P1 activities only. Separate P2 execution evidence is written to `runtime/verification-results/p2-completion.json`. That P2 report is not DCR conformance evidence; a P2 DCR model/log has not yet been delivered. For a separate automatic-arrival demo, keep the default `P2_SIMULATOR_ENABLED=true` and watch `currentPosition`, `eta`, and the `WaitForShipmentArrived` catch in Operate before acknowledging receipt.
 
 The reviewed five-product [execution log](../compliance/p1/execution-log.xes) and [verification report](../compliance/p1/verification.json) contain actual execution evidence and source/model hashes from this checkpoint. Regenerate and review them when implementation or models change. The report also records successful ProcessDoctor import/conformance and the metadata-only model correction. Repeat external conformance checking when the rules or log change. P1 ownership is recorded in the project documentation. The BPMN source and PDF omit student attribution at the owner's request. The DCR display title includes the owner; its semantics are unchanged and the report preserves the hashes used in the original checks. Model PDFs can be exported in Modeler or with [bpmn-to-image](https://github.com/bpmn-io/bpmn-to-image):
 
 ```bash
-npx --yes bpmn-to-image@0.10.0 --title 'P1 Shipment preparation' bpmn/shipment_preparation.bpmn:bpmn/shipment_preparation.pdf
-npx --yes bpmn-to-image@0.10.0 bpmn/transport.bpmn:bpmn/transport.pdf
+npx --yes bpmn-to-image@0.10.0 --title 'P1 Shipment preparation' 'bpmn/shipment_preparation.bpmn;bpmn/shipment_preparation.pdf'
+npx --yes bpmn-to-image@0.10.0 'bpmn/transport.bpmn;bpmn/transport.pdf'
 ```
 
 ## Persistence, isolated checks and troubleshooting

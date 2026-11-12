@@ -13,6 +13,7 @@ from pyzeebe import Job, ZeebeClient, ZeebeWorker
 from pyzeebe.errors import MessageAlreadyExistsError
 
 from registry import Conflict, Registry
+from transport_integrations import TransportIntegrations, post_json
 
 PROCESS_ID = "ShipmentPreparation"
 JOB_TYPES = [
@@ -26,9 +27,12 @@ JOB_TYPES = [
     "p2-start-journey",
     "p2-record-arrival",
     "p2-release-vehicle",
+    "p2-record-delivery-risk",
+    "p2-apply-dispatcher-decision",
 ]
 app = Flask(__name__)
 registry = Registry(os.getenv("REGISTRY_PATH", "runtime/registry.sqlite"))
+transport_integrations = TransportIntegrations()
 ready = threading.Event()
 client = None
 event_loop = None
@@ -104,6 +108,13 @@ def health():
         stage=2,
         processId=PROCESS_ID,
         jobTypes=JOB_TYPES,
+        integrations={
+            "gps": "scripted-demo" if os.getenv("P2_SIMULATOR_ENABLED", "true").lower() == "true" else "disabled",
+            "tomtom": "enabled" if os.getenv("TOMTOM_API_KEY") else "local-demo-estimate",
+            "siddhiTelemetry": "enabled" if os.getenv("SIDDIHI_TELEMETRY_URL") else "not-configured",
+            "siddhiCommands": "enabled" if os.getenv("SIDDIHI_COMMAND_URL") else "local-demo-acknowledgement",
+            "p3ArrivalNotification": "enabled" if os.getenv("P3_ARRIVAL_URL") else "queued-awaiting-endpoint",
+        },
     ), 200 if ready.is_set() else 503
 
 
@@ -289,6 +300,44 @@ def manual_arrival(shipment_id):
     ), 202
 
 
+@app.post("/integrations/siddhi/delivery-risk")
+def siddhi_delivery_risk():
+    """Receive a Siddhi alert, with eventId as the idempotency key."""
+    data = body()
+    shipment_id = text_field(data, "shipmentId")
+    event_id = text_field(data, "eventId")
+    occurred_at = utc_timestamp(data, "occurredAt")
+    payload = {
+        "eta": utc_timestamp(data, "eta"),
+        "deliveryDeadline": utc_timestamp(data, "deliveryDeadline"),
+        "reason": text_field(data, "reason"),
+        "occurredAt": occurred_at,
+    }
+    delay = data.get("estimatedDelaySeconds")
+    if delay is not None:
+        if type(delay) is not int or delay < 0:
+            raise ValueError("estimatedDelaySeconds must be a non-negative integer")
+        payload["estimatedDelaySeconds"] = delay
+    accepted = registry.queue_delivery_risk(shipment_id, event_id, payload)
+    return jsonify(status="accepted", shipmentId=shipment_id, eventId=event_id,
+                   messageId=accepted["messageId"]), 202
+
+
+@app.post("/shipments/<shipment_id>/dispatcher-decision")
+def dispatcher_decision(shipment_id):
+    """Accept a human decision for the currently unresolved delivery-risk alert."""
+    data = body()
+    route_id = data.get("routeId")
+    if route_id is not None and not isinstance(route_id, str):
+        raise ValueError("routeId must be a string")
+    accepted = registry.queue_dispatcher_decision(
+        shipment_id, text_field(data, "eventId"), text_field(data, "decision"), route_id
+    )
+    return jsonify(status="accepted", shipmentId=shipment_id,
+                   eventId=accepted["event"]["eventId"],
+                   messageId=accepted["messageId"]), 202
+
+
 @app.post("/shipments/<shipment_id>/acknowledge-receipt")
 def manual_receipt_acknowledgement(shipment_id):
     """Manual/test P2 input for the receipt acknowledgement normally sent by P3."""
@@ -394,7 +443,12 @@ async def start_transport(shipmentId, dispatchEvent, job: Job):
 
 
 async def start_journey(shipmentId, job: Job):
-    registry.start_journey(shipmentId, job.process_instance_key)
+    record = registry.get(shipmentId)
+    points = transport_integrations.route(record["routeId"])
+    eta, source = transport_integrations.eta(record["routeId"], points[0], 0)
+    registry.start_journey(
+        shipmentId, job.process_instance_key, points[0], eta, source, points
+    )
     return {}
 
 
@@ -408,10 +462,61 @@ async def release_vehicle(shipmentId, receiptEvent, job: Job):
     return {}
 
 
-async def deliver_messages():
-    """Retry unsent durable commands; successful dispatch is acknowledged by P2's worker."""
+async def record_delivery_risk(shipmentId, deliveryRiskEvent, job: Job):
+    registry.record_delivery_risk(shipmentId, job.process_instance_key, deliveryRiskEvent)
+    return {}
+
+
+async def apply_dispatcher_decision(shipmentId, dispatcherDecision, job: Job):
+    route_id = dispatcherDecision.get("routeId")
+    if route_id:
+        record = registry.get(shipmentId)
+        points = transport_integrations.route(route_id)
+        eta, eta_source = transport_integrations.eta(route_id, record["currentPosition"], 0)
+    else:
+        points, eta, eta_source = None, None, None
+    acknowledgement = await asyncio.to_thread(
+        transport_integrations.route_command,
+        {"commandId": dispatcherDecision["eventId"], "shipmentId": shipmentId,
+         "journeyId": dispatcherDecision["journeyId"], "riskEventId": dispatcherDecision["riskEventId"],
+         "command": "ChangeRoute" if route_id else "AcceptDelay", "routeId": route_id},
+    )
+    registry.apply_dispatcher_decision(
+        shipmentId, job.process_instance_key, dispatcherDecision,
+        acknowledgement, points, eta, eta_source,
+    )
+    return {"simulatorAcknowledged": True}
+
+
+async def advance_simulated_journeys():
+    """Move scripted demo routes forward; arrival still enters P2 through its message catch."""
     while True:
-        for message in registry.pending_messages():
+        for record in registry.in_transit_shipments():
+            try:
+                points = record.get("routeCoordinates") or transport_integrations.route(record["routeId"])
+                index = min(record.get("routeIndex", 0) + 1, len(points) - 1)
+                position = points[index]
+                eta, source = transport_integrations.eta(record["routeId"], position, index)
+                updated = registry.advance_telemetry(record["shipmentId"], position, index, eta, source)
+                if index == len(points) - 1 and updated.get("transportState") == "IN_TRANSIT":
+                    arrived = updated.get("lastGpsEventOccurredAt") or updated["telemetryUpdatedAt"]
+                    registry.queue_transport_event(
+                        record["shipmentId"], "ShipmentArrived",
+                        f"SIM:{record['journeyId']}:ShipmentArrived", arrived,
+                        {"recipientId": record["recipientId"], "latitude": position[0], "longitude": position[1]},
+                        source="p2-simulator", input_mode="simulated",
+                    )
+            except Conflict as error:
+                app.logger.info("Simulator skipped %s: %s", record["shipmentId"], error)
+            except Exception:
+                app.logger.exception("Simulator tick failed for %s", record["shipmentId"])
+        await asyncio.sleep(max(0.1, float(os.getenv("GPS_TICK_SECONDS", "5"))))
+
+
+async def deliver_messages():
+    """Deliver durable Zeebe messages and optional HTTP integrations."""
+    while True:
+        for message in registry.pending_messages(destination="zeebe"):
             try:
                 await asyncio.wait_for(
                     client.publish_message(
@@ -432,6 +537,25 @@ async def deliver_messages():
                 )
             else:
                 registry.message_result(message["messageId"])
+        destinations = {
+            "p3-http": os.getenv("P3_ARRIVAL_URL"),
+            "siddhi-http": os.getenv("SIDDIHI_TELEMETRY_URL"),
+        }
+        for destination, url in destinations.items():
+            if not url:
+                continue
+            for message in registry.pending_messages(destination=destination):
+                try:
+                    await asyncio.to_thread(
+                        post_json, url, message["variables"],
+                        {"Idempotency-Key": message["messageId"]},
+                    )
+                except Exception as error:
+                    registry.message_result(message["messageId"], str(error))
+                    app.logger.warning("%s delivery %s pending: %s", destination,
+                                       message["messageId"], error)
+                else:
+                    registry.message_result(message["messageId"])
         await asyncio.sleep(1)
 
 
@@ -452,11 +576,15 @@ async def main():
         start_journey,
         record_arrival,
         release_vehicle,
+        record_delivery_risk,
+        apply_dispatcher_decision,
     )
     variables_by_job = {
         "p2-start-transport": ["shipmentId", "dispatchEvent"],
         "p2-record-arrival": ["shipmentId", "arrivalEvent"],
         "p2-release-vehicle": ["shipmentId", "receiptEvent"],
+        "p2-record-delivery-risk": ["shipmentId", "deliveryRiskEvent"],
+        "p2-apply-dispatcher-decision": ["shipmentId", "dispatcherDecision"],
     }
     for job_type, handler in zip(JOB_TYPES, handlers):
         variables = variables_by_job.get(job_type, ["shipmentId"])
@@ -483,6 +611,8 @@ async def main():
         ready.set()
         async with asyncio.TaskGroup() as tasks:
             tasks.create_task(deliver_messages())
+            if os.getenv("P2_SIMULATOR_ENABLED", "true").lower() == "true":
+                tasks.create_task(advance_simulated_journeys())
             tasks.create_task(worker.work())
     finally:
         ready.clear()

@@ -213,7 +213,10 @@ class Registry:
         return True
 
     @staticmethod
-    def enqueue(db, message_id, name, correlation, variables, needs_ack=False):
+    def enqueue(
+        db, message_id, name, correlation, variables, needs_ack=False,
+        destination="zeebe",
+    ):
         data = dict(
             messageId=message_id,
             name=name,
@@ -222,6 +225,7 @@ class Registry:
             status="PENDING",
             createdAt=now(),
             needsAcknowledgement=needs_ack,
+            destination=destination,
             lastError=None,
         )
         db.execute(
@@ -509,7 +513,7 @@ class Registry:
             self.save(db, record)
             return record
 
-    def pending_messages(self):
+    def pending_messages(self, destination=None):
         with self.transaction() as db:
             pending = []
             for message_id, raw in db.execute(
@@ -518,10 +522,15 @@ class Registry:
                 data = json.loads(raw)
                 if data["status"] != "PENDING":
                     continue
+                if destination is not None and data.get("destination", "zeebe") != destination:
+                    continue
                 age = datetime.now(timezone.utc) - datetime.fromisoformat(
                     data["createdAt"].replace("Z", "+00:00")
                 )
-                if age.total_seconds() >= 86400:
+                if (
+                    data.get("destination", "zeebe") == "zeebe"
+                    and age.total_seconds() >= 86400
+                ):
                     data.update(
                         status="EXPIRED",
                         lastError="Uncertain message expired; inspect engine before recovery",
@@ -542,7 +551,10 @@ class Registry:
             data = json.loads(row[0])
             if data["status"] == "ACKNOWLEDGED":
                 return
-            data.update(status="PENDING" if error else "PUBLISHED", lastError=error)
+            status = "PENDING" if error else (
+                "ACKNOWLEDGED" if data.get("destination") in ("p3-http", "siddhi-http") else "PUBLISHED"
+            )
+            data.update(status=status, lastError=error)
             db.execute(
                 "UPDATE outbox SET data=? WHERE id=?", (json.dumps(data), message_id)
             )
@@ -604,7 +616,8 @@ class Registry:
             }
 
     def queue_transport_event(
-        self, shipment_id, event_type, event_id, occurred_at, payload, source
+        self, shipment_id, event_type, event_id, occurred_at, payload, source,
+        input_mode="manual",
     ):
         """Persist one manual/test P2 message and its retry identity atomically."""
         expected = {
@@ -631,7 +644,7 @@ class Registry:
                         "journeyId": record["journeyId"],
                         "occurredAt": occurred_at,
                         "source": source,
-                        "inputMode": "manual",
+                        "inputMode": input_mode,
                         "payload": payload,
                     }.items()
                 )
@@ -672,7 +685,7 @@ class Registry:
                 occurredAt=occurred_at,
                 recordedAt=now(),
                 source=source,
-                inputMode="manual",
+                inputMode=input_mode,
                 payload=payload,
             )
             variable = (
@@ -711,7 +724,10 @@ class Registry:
         if record.get("p2ProcessInstanceKey") != str(key):
             raise Conflict("wrong P2 engine instance")
 
-    def start_journey(self, shipment_id, key):
+    def start_journey(
+        self, shipment_id, key, position=None, eta=None, eta_source=None,
+        route_coordinates=None,
+    ):
         with self.transaction() as db:
             record = self.read(db, shipment_id)
             self.require_transport_instance(record, key)
@@ -725,7 +741,190 @@ class Registry:
                     "journey can start only after transport handoff registration"
                 )
             record["transportState"] = "IN_TRANSIT"
+            if position is not None:
+                record.update(
+                    currentPosition=position,
+                    routeCoordinates=route_coordinates,
+                    routeIndex=0,
+                    eta=eta,
+                    etaSource=eta_source,
+                    telemetryUpdatedAt=now(),
+                )
             self.event(db, record, "JourneyStarted", process="P2")
+            self.save(db, record)
+            return record
+
+    def in_transit_shipments(self):
+        with self.transaction() as db:
+            return [
+                json.loads(raw) for (raw,) in db.execute("SELECT data FROM shipments")
+                if json.loads(raw).get("transportState") == "IN_TRANSIT"
+            ]
+
+    def advance_telemetry(self, shipment_id, position, route_index, eta, eta_source):
+        with self.transaction() as db:
+            record = self.read(db, shipment_id)
+            if record.get("transportState") != "IN_TRANSIT":
+                return record
+            record.update(
+                currentPosition=position,
+                routeIndex=route_index,
+                eta=eta,
+                etaSource=eta_source,
+                telemetryUpdatedAt=now(),
+            )
+            revision = record.get("routeRevision", 0)
+            gps_event = self.event(
+                db, record, "GPSPositionUpdated", process="P2",
+                event_id=f"P2:{shipment_id}:GPSPositionUpdated:{revision}:{route_index}",
+                payload={"position": position, "routeId": record["routeId"], "routeIndex": route_index},
+            )
+            record["lastGpsEventOccurredAt"] = gps_event["occurredAt"]
+            self.enqueue(db, gps_event["eventId"], "TelemetryUpdate", shipment_id,
+                         {"event": gps_event}, destination="siddhi-http")
+            eta_event = self.event(
+                db, record, "ETAUpdated", process="P2",
+                event_id=f"P2:{shipment_id}:ETAUpdated:{revision}:{route_index}",
+                payload={"eta": eta, "etaSource": eta_source, "routeId": record["routeId"]},
+            )
+            self.enqueue(db, eta_event["eventId"], "TelemetryUpdate", shipment_id,
+                         {"event": eta_event}, destination="siddhi-http")
+            self.save(db, record)
+            return record
+
+    def queue_delivery_risk(self, shipment_id, event_id, payload):
+        with self.transaction() as db:
+            record = self.read(db, shipment_id)
+            identity = f"delivery-risk:{shipment_id}:{event_id}"
+            old = db.execute("SELECT data FROM results WHERE id=?", (identity,)).fetchone()
+            if not record.get("p2ProcessInstanceKey"):
+                raise Conflict("transport process has not registered this shipment")
+            event = {
+                "eventId": event_id, "eventType": "DeliveryRiskDetected",
+                "shipmentId": shipment_id, "journeyId": record["journeyId"],
+                "occurredAt": payload["occurredAt"], "payload": payload,
+            }
+            if old:
+                accepted = json.loads(old[0])
+                if accepted["event"] == event:
+                    return accepted
+                raise Conflict("eventId was already used with different risk details")
+            if record.get("transportState") != "IN_TRANSIT":
+                raise Conflict("delivery risk requires an in-transit shipment")
+            if record.get("pendingDeliveryRisk"):
+                raise Conflict("a delivery-risk decision is already pending")
+            message_id = f"P2:{shipment_id}:DeliveryRiskDetected:{event_id}"
+            accepted = {"messageId": message_id, "event": event}
+            record["pendingDeliveryRisk"] = event_id
+            self.enqueue(db, message_id, "DeliveryRiskDetected", shipment_id,
+                         {"shipmentId": shipment_id, "deliveryRiskEvent": event})
+            db.execute("INSERT INTO results VALUES (?,?)", (identity, json.dumps(accepted)))
+            self.save(db, record)
+            return accepted
+
+    def record_delivery_risk(self, shipment_id, key, risk_event):
+        with self.transaction() as db:
+            record = self.read(db, shipment_id)
+            self.require_transport_instance(record, key)
+            row = db.execute("SELECT data FROM results WHERE id=?",
+                             (f"delivery-risk:{shipment_id}:{risk_event['eventId']}",)).fetchone()
+            if not row or json.loads(row[0])["event"] != risk_event:
+                raise Conflict("delivery risk was not accepted by the integration endpoint")
+            event_id = f"P2:{shipment_id}:DeliveryRiskDetected:{risk_event['eventId']}"
+            self.event(db, record, "DeliveryRiskDetected", process="P2", event_id=event_id,
+                       payload=risk_event["payload"], occurred_at=risk_event["occurredAt"],
+                       producer_event_id=risk_event["eventId"])
+            self.save(db, record)
+            return record
+
+    def queue_dispatcher_decision(self, shipment_id, event_id, decision, route_id=None):
+        with self.transaction() as db:
+            record = self.read(db, shipment_id)
+            risk_id = record.get("pendingDeliveryRisk")
+            if not risk_id or record.get("transportState") != "IN_TRANSIT":
+                for (raw,) in db.execute(
+                    "SELECT data FROM results WHERE id LIKE ?",
+                    (f"dispatcher-decision:{shipment_id}:%",),
+                ):
+                    accepted = json.loads(raw)
+                    event = accepted["event"]
+                    if event["eventId"] == event_id and event["decision"] == decision and event.get("routeId") == route_id:
+                        if accepted.get("status") == "SUPERSEDED":
+                            raise Conflict("arrival closed the delivery-risk decision")
+                        return accepted
+                raise Conflict("no delivery-risk decision is waiting")
+            for (raw,) in db.execute(
+                "SELECT data FROM results WHERE id LIKE ?",
+                (f"dispatcher-decision:{shipment_id}:%",),
+            ):
+                previous = json.loads(raw)["event"]
+                if previous["eventId"] == event_id and previous["riskEventId"] != risk_id:
+                    raise Conflict("eventId was already used for another risk decision")
+            identity = f"dispatcher-decision:{shipment_id}:{risk_id}"
+            old = db.execute("SELECT data FROM results WHERE id=?", (identity,)).fetchone()
+            if old:
+                accepted = json.loads(old[0])
+                if accepted["event"]["eventId"] == event_id and accepted["event"]["decision"] == decision and accepted["event"].get("routeId") == route_id:
+                    return accepted
+                raise Conflict("a dispatcher decision is already accepted for this alert")
+            if decision not in ("ACCEPT_DELAY", "APPROVE_ALTERNATIVE_ROUTE"):
+                raise ValueError("decision must be ACCEPT_DELAY or APPROVE_ALTERNATIVE_ROUTE")
+            if decision == "APPROVE_ALTERNATIVE_ROUTE":
+                if route_id not in ("route-01", "route-02", "route-03") or route_id == record["routeId"]:
+                    raise ValueError("routeId must name a different configured route")
+            elif route_id is not None:
+                raise ValueError("routeId is only valid for an alternative-route decision")
+            event = {"eventId": event_id, "shipmentId": shipment_id,
+                     "journeyId": record["journeyId"], "riskEventId": risk_id,
+                     "decision": decision, "routeId": route_id, "occurredAt": now()}
+            message_id = f"P2:{shipment_id}:DispatcherDecisionRecorded:{event_id}"
+            accepted = {"messageId": message_id, "event": event}
+            self.enqueue(db, message_id, "DispatcherDecisionRecorded", shipment_id,
+                         {"shipmentId": shipment_id, "dispatcherDecision": event})
+            db.execute("INSERT INTO results VALUES (?,?)", (identity, json.dumps(accepted)))
+            return accepted
+
+    def apply_dispatcher_decision(
+        self, shipment_id, key, decision_event, acknowledgement,
+        route_coordinates=None, eta=None, eta_source=None,
+    ):
+        with self.transaction() as db:
+            record = self.read(db, shipment_id)
+            self.require_transport_instance(record, key)
+            row = db.execute("SELECT data FROM results WHERE id=?",
+                             (f"dispatcher-decision:{shipment_id}:{decision_event['riskEventId']}",)).fetchone()
+            if not row or json.loads(row[0])["event"] != decision_event:
+                raise Conflict("dispatcher decision was not accepted")
+            if acknowledgement.get("commandId") != decision_event["eventId"] or acknowledgement.get("simulatorAcknowledged") is not True:
+                raise Conflict("simulator acknowledgement is required before applying the decision")
+            if db.execute("SELECT 1 FROM events WHERE id=?",
+                          (f"P2:{shipment_id}:DispatcherDecision:{decision_event['eventId']}",)).fetchone():
+                return record
+            if record.get("transportState") != "IN_TRANSIT" or record.get("pendingDeliveryRisk") != decision_event["riskEventId"]:
+                raise Conflict("decision no longer matches the pending delivery risk")
+            if decision_event["decision"] == "APPROVE_ALTERNATIVE_ROUTE":
+                route_coordinates = list(route_coordinates or [])
+                if record.get("currentPosition") and route_coordinates:
+                    route_coordinates[0] = record["currentPosition"]
+                record.update(
+                    routeId=decision_event["routeId"], routeIndex=0,
+                    routeCoordinates=route_coordinates,
+                    routeRevision=record.get("routeRevision", 0) + 1,
+                    eta=eta, etaSource=eta_source,
+                )
+            record.pop("pendingDeliveryRisk", None)
+            self.event(db, record, "DispatcherDecisionRecorded", process="P2",
+                       event_id=f"P2:{shipment_id}:DispatcherDecision:{decision_event['eventId']}",
+                       payload={"decision": decision_event["decision"], "routeId": decision_event.get("routeId"),
+                                "simulatorAcknowledgement": acknowledgement})
+            if decision_event["decision"] == "APPROVE_ALTERNATIVE_ROUTE":
+                self.event(
+                    db, record, "RouteChangeAcknowledged", process="P2",
+                    event_id=f"P2:{shipment_id}:RouteChangeAcknowledged:{decision_event['eventId']}",
+                    payload={"commandId": decision_event["eventId"],
+                             "routeId": decision_event["routeId"],
+                             "simulatorAcknowledgement": acknowledgement},
+                )
             self.save(db, record)
             return record
 
@@ -752,6 +951,37 @@ class Registry:
                     f"found {record.get('transportState')}"
                 )
             record["transportState"] = "ARRIVED"
+            risk_id = record.pop("pendingDeliveryRisk", None)
+            if risk_id:
+                decision_row = db.execute(
+                    "SELECT data FROM results WHERE id=?",
+                    (f"dispatcher-decision:{shipment_id}:{risk_id}",),
+                ).fetchone()
+                if decision_row:
+                    decision = json.loads(decision_row[0])
+                    decision["status"] = "SUPERSEDED"
+                    db.execute(
+                        "UPDATE results SET data=? WHERE id=?",
+                        (json.dumps(decision), f"dispatcher-decision:{shipment_id}:{risk_id}"),
+                    )
+                    outbox_id = decision.get("messageId")
+                    if outbox_id:
+                        outbox_row = db.execute(
+                            "SELECT data FROM outbox WHERE id=?", (outbox_id,)
+                        ).fetchone()
+                        if outbox_row:
+                            outbox_data = json.loads(outbox_row[0])
+                            if outbox_data.get("status") == "PENDING":
+                                outbox_data.update(status="SUPERSEDED", lastError="arrival closed the decision")
+                                db.execute(
+                                    "UPDATE outbox SET data=? WHERE id=?",
+                                    (json.dumps(outbox_data), outbox_id),
+                                )
+                self.event(
+                    db, record, "DeliveryRiskClosedAtArrival", process="P2",
+                    event_id=f"P2:{shipment_id}:DeliveryRiskClosedAtArrival:{risk_id}",
+                    payload={"riskEventId": risk_id},
+                )
             self.event(
                 db,
                 record,
@@ -767,6 +997,24 @@ class Registry:
                 producer_event_id=accepted["eventId"],
             )
             self.save(db, record)
+            notification_id = f"P3:ShipmentArrivalNotification:{shipment_id}:{accepted['eventId']}"
+            notification = {
+                "deliveryId": notification_id,
+                "eventType": "ShipmentArrivalNotification",
+                "shipmentId": shipment_id,
+                "journeyId": record["journeyId"],
+                "productId": record["productId"],
+                "batchId": record["batchId"],
+                "arrival": accepted["payload"],
+                "sourceEventId": accepted["eventId"],
+                "occurredAt": accepted["occurredAt"],
+                "recordedAt": accepted["recordedAt"],
+            }
+            for ref in ("originalShipmentId", "incidentId"):
+                if ref in record:
+                    notification[ref] = record[ref]
+            self.enqueue(db, notification_id, "ShipmentArrivalNotification", shipment_id,
+                         {"event": notification}, needs_ack=True, destination="p3-http")
             return record
 
     def release_vehicle(self, shipment_id, key, receipt_event):

@@ -1,0 +1,25 @@
+@App:name("ColdChainTelemetry")
+
+@source(type='http',
+        receiver.url='http://0.0.0.0:8006/telemetry',
+        @map(type='json'))
+define stream TransportTelemetryStream (
+    eventId string,
+    eventType string,
+    shipmentId string,
+    journeyId string,
+    occurredAt string
+);
+
+@sink(type='log', prefix='COLD-CHAIN')
+define stream TransportLogStream (
+    eventId string,
+    eventType string,
+    shipmentId string,
+    journeyId string,
+    occurredAt string
+);
+
+from TransportTelemetryStream
+select eventId, eventType, shipmentId, journeyId, occurredAt
+insert into TransportLogStream;

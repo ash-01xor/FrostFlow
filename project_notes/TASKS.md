@@ -1,11 +1,11 @@
 # Team task board
 
-**Ashvanth owns P1; Rahul owns the current P2 manual-flow increment.** P3–P6 and simulator/CEP owners remain unassigned. Use `TODO`, `IN PROGRESS`, `IMPLEMENTED / VERIFY`, `BLOCKED` and `DONE`. A checked box records only the specific item described.
+**Ashvanth owns P1; Rahul owns P2.** P3–P6 and external simulator/CEP owners remain unassigned. Use `TODO`, `IN PROGRESS`, `IMPLEMENTED / VERIFY`, `BLOCKED` and `DONE`. A checked box records only the specific item described.
 
 | Work | Owner | Status | Main dependency |
 | --- | --- | --- | --- |
 | P1 Shipment preparation | Ashvanth | IMPLEMENTED; engine and external conformance verified | Teammate review |
-| P2 Transport and delivery | Rahul | MANUAL FLOW IMPLEMENTED; full P2 IN PROGRESS | [Detailed handover](../docs/COLD-CHAIN-INTEGRATION-AGREEMENT.md#p2-and-p3-development-handover); P3 contract, simulator, ETA and risk decisions |
+| P2 Transport and delivery | Rahul | MANUAL FLOW + SCRIPTED SIMULATOR/DECISION PATH IMPLEMENTED; external verification IN PROGRESS | [Detailed handover](../docs/COLD-CHAIN-INTEGRATION-AGREEMENT.md#p2-and-p3-development-handover); confirm Siddhi/P3 contracts and perform live acceptance |
 | P3 Receiving and admission | Unassigned | TODO | P2 arrival + P4 shared hold |
 | P4 Quality investigation (DCR) | Unassigned | TODO | DCR access + incident integration |
 | P5 Corrective fulfilment | Unassigned | TODO | P4 authorised disposition + P1–P3 |
@@ -60,20 +60,28 @@ The catalogue and scope assumptions are documented in [the run guide](../docs/RU
 - [x] Consume `ShipmentDispatched`, register one transport instance and acknowledge the handoff; reject duplicate effects.
 - [x] Extend P2 through `StartJourney`, arrival catch/recording, receipt catch, vehicle release and `TransportCompleted`.
 - [x] Add manual/test arrival and receipt endpoints, transactional states/activities, exact retries and vehicle-release gating.
-- [x] Extend the CLI for manual arrival/receipt, state-aware Operate hints and polling to `ARRIVED`/`COMPLETED`.
+- [x] Extend the CLI for manual receipt, optional manual arrival, state-aware Operate hints, scripted-risk input and dispatcher decisions.
 - [x] Add a regression for external event IDs colliding with internal activity IDs.
 - [x] Run the 33-test offline suite at tested commit `720ed5109fc26ec5b128f87010d01b62bc9628e4`; command: `python -m unittest discover -s stage_tests -p 'test_*.py' -v`.
 - [x] Run `stage_tests/check_stage1.py` on a fresh version-3 dataset and verify two P2 completions, receipt gating, retries, Zeebe end events and vehicle reuse. P1 compliance artifacts: `runtime/verification-results/execution-log.xes` and `verification.json`; P2 execution evidence: `runtime/verification-results/p2-completion.json`. This live report is from the manual-flow validation run; the later legacy-collision repair is covered by the offline regression at tested commit `720ed5109fc26ec5b128f87010d01b62bc9628e4`. Runtime evidence is local/ignored; P2 JSON is not DCR conformance evidence.
 - [x] Manually observe the CLI/Operate flow through `WaitForReceiptAcknowledged`, `TransportCompleted` and vehicle release.
-- [ ] Add the durable P2-arrival-to-P3 notification after agreeing its contract with the P3 owner.
-- [ ] Produce scripted GPS; fetch fresh traffic-aware TomTom ETA for remaining route.
-- [ ] Handle `DeliveryRiskDetected` with an explicit, deduplicated dispatcher decision.
-- [ ] Send approved route changes through Siddhi and the simulator; record acknowledgement and changed movement/ETA.
-- [ ] Add dispatcher CLI controls for risk decisions and route changes.
+- [x] Add the P3 arrival notification to the durable outbox with a distinct delivery ID and shipment/journey/product/batch/replacement/incident references.
+- [x] Script GPS positions and record ETA updates; make the last route point publish automatic arrival.
+- [x] Add a TomTom traffic-ETA adapter with a labeled local fallback.
+- [x] Add the correlated `DeliveryRiskDetected` BPMN branch and deduplicate unresolved alerts.
+- [x] Add delay acceptance and alternative-route decisions; require matching simulator acknowledgement before recording route change.
+- [x] Add CLI controls for test risk, delay acceptance and route approval.
+- [ ] Agree the P3 receiver envelope/idempotency response with its owner; verify retries start P3 once against the real receiver.
+- [ ] Verify automatic arrival and route updates for two independent shipments in Operate.
+- [ ] Verify a TomTom ETA request with the team's API key and record its source/response.
+- [ ] Verify Siddhi receives telemetry and emits a shipment-correlated risk alert.
+- [ ] Verify an approved route command reaches the simulator through Siddhi, receives acknowledgement, then changes GPS/ETA.
+- [ ] Rehearse the risk/decision/route controls from the CLI against the live stack.
+- [ ] Rerun the expanded 35-test offline suite under Python 3.12; the current local Python 3.10 runtime lacks `grpc`.
 - [ ] Deliver P2 DCR rules and a real execution log; verify conformance separately from P1.
-- [ ] Verify full P2 integrations: automatic arrival, risk handling, route change acknowledgement and independent journeys.
+- [ ] Run the final live P2 acceptance with both independent journeys, automatic arrival, dispatcher outcomes, external notifications and receipt-gated release.
 
-Follow-up PR/issue links and owners have not been agreed yet. Add the links and named owners here once the team assigns them; keep P3 notification, GPS/automatic arrival, TomTom ETA, risk decisions, acknowledged route changes, dispatcher CLI controls and P2 DCR verification as separate deliverables. See the [file-by-file handover](../docs/COLD-CHAIN-INTEGRATION-AGREEMENT.md#full-p2-work-still-outstanding).
+External P3/Siddhi/TomTom service owners and follow-up PR/issue links have not been agreed yet. Add names and links after team review. The code is implemented behind configurable endpoints; live acceptance and P2 DCR remain outstanding. See the [file-by-file handover](../docs/COLD-CHAIN-INTEGRATION-AGREEMENT.md#p2-and-p3-development-handover).
 
 ## P3 — Receiving and stock admission
 
