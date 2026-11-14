@@ -333,13 +333,18 @@ def simulator_route_command():
     data = envelope.get("event", envelope)
     if not isinstance(data, dict):
         raise ValueError("event must be an object")
+    route_id = data.get("routeId")
+    # Siddhi's JSON sink serialises a null string attribute as "undefined";
+    # AcceptDelay carries no route, so treat that (and "") as absent.
+    if route_id in ("undefined", ""):
+        route_id = None
     command = {
         "commandId": text_field(data, "commandId"),
         "shipmentId": text_field(data, "shipmentId"),
         "journeyId": text_field(data, "journeyId"),
         "riskEventId": text_field(data, "riskEventId"),
         "command": text_field(data, "command"),
-        "routeId": data.get("routeId"),
+        "routeId": route_id,
     }
     if command["routeId"] is not None and not isinstance(command["routeId"], str):
         raise ValueError("routeId must be a string")
@@ -586,8 +591,11 @@ async def main():
     global client, event_loop
     event_loop = asyncio.get_running_loop()
     channel = grpc.aio.insecure_channel(os.getenv("ZEEBE_ADDRESS", "localhost:26501"))
-    client = ZeebeClient(grpc_channel=channel)
-    worker = ZeebeWorker(grpc_channel=channel)
+    # pyzeebe closes the shared channel after 10 failed calls by default. A fresh
+    # Zeebe broker can take over 30 s to start, so keep retrying; the deploy loop
+    # below still bounds startup.
+    client = ZeebeClient(grpc_channel=channel, max_connection_retries=-1)
+    worker = ZeebeWorker(grpc_channel=channel, max_connection_retries=-1)
     handlers = (
         check_stock,
         allocate_stock,

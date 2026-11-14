@@ -369,7 +369,30 @@ python tools/demo.py --deadline-minutes 1
 
 In the CLI, create a shipment with **1**, verify loading with **3**, then dispatch with **4**. Use **2** to poll the shipment. After the first late ETA reaches Siddhi, its `COLD-CHAIN-RISK` log and P2 `DeliveryRiskDetected` activity should appear, and the instance should wait at the dispatcher decision. Choose **13** and select a route different from the current route. A successful decision records the simulator acknowledgement before updating `routeId`; later position and ETA updates should use that route. In Operate, confirm P2 still waits for receipt after automatic arrival, then use **10** to acknowledge receipt and confirm completion and vehicle release. `docker compose logs -f siddhi` shows telemetry and risk events; `docker compose logs -f communication` shows message delivery and worker errors.
 
-Option **11** remains a manual test alert and bypasses Siddhi's risk detection; do not use it for this walkthrough. A local route-command acknowledgement verifies the Siddhi-to-scripted-simulator path only. It does not prove integration with a physical/external simulator. P3 delivery and P2 DCR evidence remain separate outstanding work.
+Option **11** remains a manual test alert and bypasses Siddhi's risk detection; do not use it for this walkthrough. A local route-command acknowledgement verifies the Siddhi-to-scripted-simulator path only. It does not prove integration with a physical/external simulator. P3 delivery remains separate outstanding work.
+
+Siddhi listens on two ports: **8006** for telemetry and **8007** for route commands. Its `http` and `http-service` sources cannot share one listener. If an alert is missing, check `docker compose logs siddhi` for `Siddhi App ColdChainTelemetry deployed successfully` first.
+
+**Automated live check.** Instead of driving the CLI, run the same flow unattended on a fresh dataset:
+
+```powershell
+$env:REGISTRY_DIR = "./runtime/p2-siddhi-check"
+$env:GPS_TICK_SECONDS = "10"
+docker compose -p cold-chain-p2-siddhi-check up --build -d --wait --wait-timeout 240
+python stage_tests/check_p2_siddhi.py
+```
+
+It dispatches two shipments at once. A has a one-minute deadline: Siddhi must raise the alert, an approved route change must be acknowledged through Siddhi, and later GPS/ETA must use the new route revision. A second late ETA on that revision is answered with an accepted delay. B has a 60-minute deadline and must raise no alert. Both must stay `ARRIVED` with their vehicle reserved until receipt, then complete. Evidence is written to `runtime/verification-results/p2-siddhi.json`. The reviewed result is in [compliance/p2/verification.json](../compliance/p2/verification.json).
+
+### P2 DCR compliance
+
+[compliance/p2/rules.xml](../compliance/p2/rules.xml) checks P2's recorded activities, plus the neighbouring P1 `ShipmentDispatched`. `VehicleReleased` has `ReceiptAcknowledged` as a condition. A `DeliveryRiskDetected` alert includes a `DispatcherDecisionRecorded` response and makes it pending. That pending decision is a milestone blocking a second alert and the vehicle release. `RouteChangeAcknowledged` is only included by a decision. Arrival excludes all further risk activity, so an undecided alert that arrival supersedes is not owed. GPS/ETA telemetry is sensor data for Siddhi and is left out of the log.
+
+```bash
+python compliance/check.py compliance/p2/execution-log.xes --model compliance/p2/rules.xml
+```
+
+Expect both real traces to be valid and accepting. Each synthetic violation in [invalid-traces.json](../compliance/p2/invalid-traces.json) must be rejected; the offline suite checks this. To regenerate the evidence after a new live run, use `python compliance/p2/build_p2_evidence.py log runtime/verification-results/p2-siddhi.json`. Flat DCR cannot see whether a decision was a route change or an accepted delay; the application checks that from the decision data.
 
 The reviewed five-product [execution log](../compliance/p1/execution-log.xes) and [verification report](../compliance/p1/verification.json) contain actual execution evidence and source/model hashes from this checkpoint. Regenerate and review them when implementation or models change. The report also records successful ProcessDoctor import/conformance and the metadata-only model correction. Repeat external conformance checking when the rules or log change. P1 ownership is recorded in the project documentation. The BPMN source and PDF omit student attribution at the owner's request. The DCR display title includes the owner; its semantics are unchanged and the report preserves the hashes used in the original checks. Model PDFs can be exported in Modeler or with [bpmn-to-image](https://github.com/bpmn-io/bpmn-to-image):
 

@@ -1,5 +1,6 @@
 """Offline API/business-effect checks. Engine calls are substituted."""
 
+import json
 import os
 import subprocess
 import sys
@@ -577,6 +578,32 @@ class Preparation(unittest.TestCase):
         )
         self.assertEqual(self.http.post("/shipments/S-test/dispatcher-decision", json=decision).status_code, 202)
 
+    def test_simulator_accepts_siddhi_accept_delay_without_route(self):
+        """Siddhi's JSON sink sends a null routeId as the string "undefined"."""
+        self.start_p2_transport()
+        self.assertEqual(self.http.post("/integrations/siddhi/delivery-risk", json={
+            "event": {
+                "shipmentId": "S-test", "eventId": "SIDDHI:RISK:eta-1",
+                "occurredAt": "2026-12-01T10:20:00Z", "eta": "2026-12-01T12:00:00Z",
+                "deliveryDeadline": "2026-12-01T11:00:00Z",
+                "reason": "ETA exceeds delivery deadline", "estimatedDelaySeconds": 3600,
+            },
+        }).status_code, 202)
+        command = {
+            "messageId": "siddhi-message-1", "commandId": "decision-delay",
+            "shipmentId": "S-test", "journeyId": "J-test",
+            "riskEventId": "SIDDHI:RISK:eta-1", "command": "AcceptDelay",
+        }
+        for route_id in ("undefined", "undefined", ""):
+            response = self.http.post("/integrations/simulator/route-command",
+                                      json={"event": {**command, "routeId": route_id}})
+            self.assertEqual(response.status_code, 200, response.json)
+            self.assertEqual(response.json["commandId"], "decision-delay")
+            self.assertIs(response.json["simulatorAcknowledged"], True)
+        rejected = self.http.post("/integrations/simulator/route-command",
+                                  json={"event": {**command, "routeId": "route-02"}})
+        self.assertIn(rejected.status_code, (400, 409))
+
     def test_p2_manual_event_rejects_invalid_time_and_mismatched_receipt(self):
         unknown_arrival = self.http.post(
             "/shipments/not-known/arrive",
@@ -1050,6 +1077,49 @@ class Preparation(unittest.TestCase):
                 "/shipments/demo-A/acknowledge-receipt",
             ],
         )
+
+
+class P2Compliance(unittest.TestCase):
+    P2 = Path(__file__).resolve().parents[1] / "compliance/p2"
+
+    def test_real_p2_log_conforms(self):
+        from compliance.check import read_traces, replay
+
+        traces = read_traces(self.P2 / "execution-log.xes")
+        self.assertGreaterEqual(len(traces), 2)
+        self.assertTrue(any("RouteChangeAcknowledged" in t for t in traces.values()))
+        for case, events in traces.items():
+            with self.subTest(case=case):
+                result = replay(self.P2 / "rules.xml", events)
+                self.assertTrue(result["valid"] and result["accepting"], result)
+
+    def test_invalid_p2_traces_are_rejected(self):
+        from compliance.check import replay
+
+        data = json.loads((self.P2 / "invalid-traces.json").read_text())
+        traces = {k: v for k, v in data.items() if isinstance(v, list)}
+        self.assertEqual(len(traces), 4)
+        for case, events in traces.items():
+            with self.subTest(case=case):
+                self.assertFalse(replay(self.P2 / "rules.xml", events)["valid"])
+
+    def test_receipt_is_owed_after_arrival(self):
+        from compliance.check import replay
+
+        result = replay(self.P2 / "rules.xml", [
+            "ShipmentDispatched", "TransportStarted", "JourneyStarted", "ShipmentArrived"])
+        self.assertTrue(result["valid"])
+        self.assertFalse(result["accepting"])
+        self.assertIn("ReceiptAcknowledged", result["pending"])
+
+    def test_p2_graph_has_portal_metadata(self):
+        Graph(self.P2 / "rules.xml")
+        import xml.etree.ElementTree as ET
+
+        resources = ET.parse(self.P2 / "rules.xml").getroot().find("./specification/resources")
+        self.assertIsNotNone(resources.find("subProcesses"))
+        for event in resources.findall("events/event"):
+            self.assertIsNotNone(event.find("custom/visualization/location"))
 
 
 class Compliance(unittest.TestCase):

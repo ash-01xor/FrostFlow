@@ -1,15 +1,26 @@
 @App:name("ColdChainTelemetry")
+@App:description("P2 transport telemetry: late-ETA delivery-risk alerts and dispatcher route commands")
 
 /*
+ * SiddhiQL requires every stream definition to appear before the first query,
+ * so all definitions are grouped here and the queries follow below.
+ *
  * Telemetry arrives from the durable P2 outbox as {"event": { ... }}.
- * ETAUpdated events past the deadline produce one alert per route revision.
+ * GPSPositionUpdated events carry no ETA fields, so the mapper must accept
+ * missing attributes (they become null) instead of dropping the event.
+ * ETAUpdated events past the deadline produce one alert per
+ * shipment/journey/route revision.
+ *
  * Dispatcher commands are handled synchronously so P2 only applies a route
  * after the scripted simulator receiver has acknowledged the same commandId.
  */
 
+-- ---------------------------------------------------------------- definitions
+
 @source(type='http',
         receiver.url='http://0.0.0.0:8006/telemetry',
-        @map(type='json', @attributes(
+        basic.auth.enabled='false',
+        @map(type='json', fail.on.missing.attribute='false', @attributes(
             eventId='$.event.eventId',
             eventType='$.event.eventType',
             shipmentId='$.event.shipmentId',
@@ -47,9 +58,15 @@ define stream TransportLogStream (
     routeId string
 );
 
-from TransportTelemetryStream
-select eventId, eventType, shipmentId, journeyId, occurredAt, eta, routeId
-insert into TransportLogStream;
+define stream DeliveryRiskStream (
+    shipmentId string,
+    eventId string,
+    occurredAt string,
+    eta string,
+    deliveryDeadline string,
+    reason string,
+    estimatedDelaySeconds long
+);
 
 @sink(type='http', publisher.url='http://communication:5001/integrations/siddhi/delivery-risk',
       method='POST', @map(type='json'))
@@ -74,43 +91,14 @@ define stream DeliveryRiskLogStream (
     estimatedDelaySeconds long
 );
 
-define stream DeliveryRiskStream (
-    shipmentId string,
-    eventId string,
-    occurredAt string,
-    eta string,
-    deliveryDeadline string,
-    reason string,
-    estimatedDelaySeconds long
-);
-
-from TransportTelemetryStream[ eventType == 'ETAUpdated' and
-                              etaMillis > deliveryDeadlineMillis ]
-#window.unique:first(str:concat(shipmentId, ':', journeyId, ':', routeRevision))
-select shipmentId,
-       str:concat('SIDDHI:RISK:', eventId) as eventId,
-       occurredAt,
-       eta,
-       deliveryDeadline,
-       'ETA exceeds delivery deadline' as reason,
-       math:round((etaMillis - deliveryDeadlineMillis) / 1000.0) as estimatedDelaySeconds
-insert into DeliveryRiskStream;
-
-from DeliveryRiskStream
-select shipmentId, eventId, occurredAt, eta, deliveryDeadline, reason, estimatedDelaySeconds
-insert into DeliveryRiskOutStream;
-
-from DeliveryRiskStream
-select shipmentId, eventId, occurredAt, eta, deliveryDeadline, reason, estimatedDelaySeconds
-insert into DeliveryRiskLogStream;
-
 /*
  * A decision worker POSTs to /route-command and waits for the matching
- * http-service-response. The forwarding sink receives the simulator's JSON
- * acknowledgement and returns it to that original HTTP request.
+ * http-service-response. The forwarding http-call sink receives the
+ * simulator's JSON acknowledgement and returns it to that original request.
  */
-@source(type='http-service', receiver.url='http://0.0.0.0:8006/route-command',
-        source.id='route-command', @map(type='json', @attributes(
+@source(type='http-service', receiver.url='http://0.0.0.0:8007/route-command',
+        source.id='route-command', basic.auth.enabled='false',
+        @map(type='json', @attributes(
             messageId='trp:messageId',
             commandId='$.event.commandId',
             shipmentId='$.event.shipmentId',
@@ -142,11 +130,7 @@ define stream SimulatorCommandOutStream (
     routeId string
 );
 
-from RouteCommandStream
-select messageId, commandId, shipmentId, journeyId, riskEventId, command, routeId
-insert into SimulatorCommandOutStream;
-
-@source(type='http-call-response', sink.id='simulator-command', http.status.code='2.*',
+@source(type='http-call-response', sink.id='simulator-command', http.status.code='200',
         @map(type='json', @attributes(
             messageId='trp:messageId',
             commandId='trp:commandId',
@@ -167,6 +151,43 @@ define stream RouteCommandResponseStream (
     simulatorAcknowledged bool
 );
 
+-- -------------------------------------------------------------------- queries
+
+@info(name='log-telemetry')
+from TransportTelemetryStream
+select eventId, eventType, shipmentId, journeyId, occurredAt, eta, routeId
+insert into TransportLogStream;
+
+@info(name='detect-late-eta')
+from TransportTelemetryStream[eventType == 'ETAUpdated'
+                              and not (etaMillis is null)
+                              and not (deliveryDeadlineMillis is null)
+                              and etaMillis > deliveryDeadlineMillis]#window.unique:first(shipmentId, journeyId, routeRevision)
+select shipmentId,
+       str:concat('SIDDHI:RISK:', eventId) as eventId,
+       occurredAt,
+       eta,
+       deliveryDeadline,
+       'ETA exceeds delivery deadline' as reason,
+       math:round((etaMillis - deliveryDeadlineMillis) / 1000.0) as estimatedDelaySeconds
+insert current events into DeliveryRiskStream;
+
+@info(name='forward-risk')
+from DeliveryRiskStream
+select *
+insert into DeliveryRiskOutStream;
+
+@info(name='log-risk')
+from DeliveryRiskStream
+select *
+insert into DeliveryRiskLogStream;
+
+@info(name='forward-route-command')
+from RouteCommandStream
+select messageId, commandId, shipmentId, journeyId, riskEventId, command, routeId
+insert into SimulatorCommandOutStream;
+
+@info(name='return-acknowledgement')
 from SimulatorCommandAckStream
 select messageId, commandId, simulatorAcknowledged
 insert into RouteCommandResponseStream;

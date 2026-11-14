@@ -1,0 +1,8 @@
+{
+  "kind": "deliberately-invalid-test-traces",
+  "description": "Synthetic P2 violations; not part of the execution log. Each must be rejected.",
+  "vehicle-released-without-receipt": ["ShipmentDispatched", "TransportStarted", "JourneyStarted", "ShipmentArrived", "VehicleReleased"],
+  "route-change-without-decision": ["ShipmentDispatched", "TransportStarted", "JourneyStarted", "DeliveryRiskDetected", "RouteChangeAcknowledged"],
+  "second-risk-while-decision-pending": ["ShipmentDispatched", "TransportStarted", "JourneyStarted", "DeliveryRiskDetected", "DeliveryRiskDetected"],
+  "arrival-before-journey": ["ShipmentDispatched", "TransportStarted", "ShipmentArrived"]
+}
