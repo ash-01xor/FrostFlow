@@ -160,10 +160,12 @@ def main():
             ),
         )
         wait(
-            "P2 waiting for arrival",
+            "P2 waiting for journey events",
+            # Since the risk branch, P2 waits at the event-based gateway; Zeebe
+            # activates the arrival catch only when ShipmentArrived triggers it.
             lambda: engine_records(
                 record["p2ProcessInstanceKey"],
-                "WaitForShipmentArrived",
+                "JourneyEvents",
                 "ELEMENT_ACTIVATED",
             ),
         )
@@ -281,9 +283,11 @@ def main():
             assert other_record["transportState"] == "IN_TRANSIT", other_record
             assert other_record["vehicleReleased"] is False, other_record
             wait(
-                "independent shipment remains at arrival catch",
+                "independent shipment still waits for journey events",
                 lambda: engine_records(
-                    other_key, "WaitForShipmentArrived", "ELEMENT_ACTIVATED"
+                    other_key, "JourneyEvents", "ELEMENT_ACTIVATED"
+                ) and not engine_records(
+                    other_key, "WaitForShipmentArrived", "ELEMENT_COMPLETED"
                 ),
             )
         for _ in range(2):

@@ -1,0 +1,197 @@
+<?xml version='1.0' encoding='utf-8'?>
+<dcrgraph title="P2 transport and delivery compliance — Rahul Shanbhag" dataTypesStatus="hide">
+  <specification>
+    <resources>
+      <events>
+        <event id="ShipmentDispatched">
+          <custom>
+            <eventData />
+            <visualization>
+              <location xLoc="60" yLoc="60" />
+              <size width="130" height="150" />
+            </visualization>
+          </custom>
+        </event>
+        <event id="TransportStarted">
+          <custom>
+            <eventData />
+            <visualization>
+              <location xLoc="320" yLoc="60" />
+              <size width="130" height="150" />
+            </visualization>
+          </custom>
+        </event>
+        <event id="JourneyStarted">
+          <custom>
+            <eventData />
+            <visualization>
+              <location xLoc="580" yLoc="60" />
+              <size width="130" height="150" />
+            </visualization>
+          </custom>
+        </event>
+        <event id="ShipmentArrived">
+          <custom>
+            <eventData />
+            <visualization>
+              <location xLoc="840" yLoc="60" />
+              <size width="130" height="150" />
+            </visualization>
+          </custom>
+        </event>
+        <event id="ReceiptAcknowledged">
+          <custom>
+            <eventData />
+            <visualization>
+              <location xLoc="1100" yLoc="60" />
+              <size width="130" height="150" />
+            </visualization>
+          </custom>
+        </event>
+        <event id="VehicleReleased">
+          <custom>
+            <eventData />
+            <visualization>
+              <location xLoc="1360" yLoc="60" />
+              <size width="130" height="150" />
+            </visualization>
+          </custom>
+        </event>
+        <event id="DeliveryRiskDetected">
+          <custom>
+            <eventData />
+            <visualization>
+              <location xLoc="580" yLoc="340" />
+              <size width="130" height="150" />
+            </visualization>
+          </custom>
+        </event>
+        <event id="DispatcherDecisionRecorded">
+          <custom>
+            <eventData />
+            <visualization>
+              <location xLoc="840" yLoc="340" />
+              <size width="130" height="150" />
+            </visualization>
+          </custom>
+        </event>
+        <event id="RouteChangeAcknowledged">
+          <custom>
+            <eventData />
+            <visualization>
+              <location xLoc="1100" yLoc="340" />
+              <size width="130" height="150" />
+            </visualization>
+          </custom>
+        </event>
+        <event id="DeliveryRiskClosedAtArrival">
+          <custom>
+            <eventData />
+            <visualization>
+              <location xLoc="840" yLoc="620" />
+              <size width="130" height="150" />
+            </visualization>
+          </custom>
+        </event>
+      </events>
+      <labels>
+        <label id="ShipmentDispatched" />
+        <label id="TransportStarted" />
+        <label id="JourneyStarted" />
+        <label id="ShipmentArrived" />
+        <label id="ReceiptAcknowledged" />
+        <label id="VehicleReleased" />
+        <label id="DeliveryRiskDetected" />
+        <label id="DispatcherDecisionRecorded" />
+        <label id="RouteChangeAcknowledged" />
+        <label id="DeliveryRiskClosedAtArrival" />
+      </labels>
+      <labelMappings>
+        <labelMapping eventId="ShipmentDispatched" labelId="ShipmentDispatched" />
+        <labelMapping eventId="TransportStarted" labelId="TransportStarted" />
+        <labelMapping eventId="JourneyStarted" labelId="JourneyStarted" />
+        <labelMapping eventId="ShipmentArrived" labelId="ShipmentArrived" />
+        <labelMapping eventId="ReceiptAcknowledged" labelId="ReceiptAcknowledged" />
+        <labelMapping eventId="VehicleReleased" labelId="VehicleReleased" />
+        <labelMapping eventId="DeliveryRiskDetected" labelId="DeliveryRiskDetected" />
+        <labelMapping eventId="DispatcherDecisionRecorded" labelId="DispatcherDecisionRecorded" />
+        <labelMapping eventId="RouteChangeAcknowledged" labelId="RouteChangeAcknowledged" />
+        <labelMapping eventId="DeliveryRiskClosedAtArrival" labelId="DeliveryRiskClosedAtArrival" />
+      </labelMappings>
+      <subProcesses />
+    </resources>
+    <constraints>
+      <conditions>
+        <condition sourceId="ShipmentDispatched" targetId="TransportStarted" />
+        <condition sourceId="TransportStarted" targetId="JourneyStarted" />
+        <condition sourceId="JourneyStarted" targetId="ShipmentArrived" />
+        <condition sourceId="JourneyStarted" targetId="DeliveryRiskDetected" />
+        <condition sourceId="ShipmentArrived" targetId="ReceiptAcknowledged" />
+        <condition sourceId="ReceiptAcknowledged" targetId="VehicleReleased" />
+        <condition sourceId="DeliveryRiskDetected" targetId="DispatcherDecisionRecorded" />
+        <condition sourceId="DispatcherDecisionRecorded" targetId="RouteChangeAcknowledged" />
+        <condition sourceId="DeliveryRiskDetected" targetId="DeliveryRiskClosedAtArrival" />
+      </conditions>
+      <responses>
+        <response sourceId="ShipmentDispatched" targetId="TransportStarted" />
+        <response sourceId="TransportStarted" targetId="VehicleReleased" />
+        <response sourceId="ShipmentArrived" targetId="ReceiptAcknowledged" />
+        <response sourceId="ReceiptAcknowledged" targetId="VehicleReleased" />
+        <response sourceId="DeliveryRiskDetected" targetId="DispatcherDecisionRecorded" />
+      </responses>
+      <includes>
+        <include sourceId="DeliveryRiskDetected" targetId="DispatcherDecisionRecorded" />
+        <include sourceId="DispatcherDecisionRecorded" targetId="RouteChangeAcknowledged" />
+        <include sourceId="DeliveryRiskDetected" targetId="DeliveryRiskClosedAtArrival" />
+      </includes>
+      <excludes>
+        <exclude sourceId="ShipmentDispatched" targetId="ShipmentDispatched" />
+        <exclude sourceId="TransportStarted" targetId="TransportStarted" />
+        <exclude sourceId="JourneyStarted" targetId="JourneyStarted" />
+        <exclude sourceId="ShipmentArrived" targetId="ShipmentArrived" />
+        <exclude sourceId="ReceiptAcknowledged" targetId="ReceiptAcknowledged" />
+        <exclude sourceId="VehicleReleased" targetId="VehicleReleased" />
+        <exclude sourceId="DispatcherDecisionRecorded" targetId="DispatcherDecisionRecorded" />
+        <exclude sourceId="RouteChangeAcknowledged" targetId="RouteChangeAcknowledged" />
+        <exclude sourceId="DeliveryRiskClosedAtArrival" targetId="DeliveryRiskClosedAtArrival" />
+        <exclude sourceId="DeliveryRiskDetected" targetId="RouteChangeAcknowledged" />
+        <exclude sourceId="ShipmentArrived" targetId="DeliveryRiskDetected" />
+        <exclude sourceId="ShipmentArrived" targetId="DispatcherDecisionRecorded" />
+        <exclude sourceId="ShipmentArrived" targetId="RouteChangeAcknowledged" />
+        <exclude sourceId="ShipmentArrived" targetId="DeliveryRiskClosedAtArrival" />
+        <exclude sourceId="DispatcherDecisionRecorded" targetId="DeliveryRiskClosedAtArrival" />
+        <exclude sourceId="DeliveryRiskClosedAtArrival" targetId="DispatcherDecisionRecorded" />
+        <exclude sourceId="VehicleReleased" targetId="ShipmentDispatched" />
+        <exclude sourceId="VehicleReleased" targetId="TransportStarted" />
+        <exclude sourceId="VehicleReleased" targetId="JourneyStarted" />
+        <exclude sourceId="VehicleReleased" targetId="ShipmentArrived" />
+        <exclude sourceId="VehicleReleased" targetId="ReceiptAcknowledged" />
+        <exclude sourceId="VehicleReleased" targetId="DeliveryRiskDetected" />
+        <exclude sourceId="VehicleReleased" targetId="DispatcherDecisionRecorded" />
+        <exclude sourceId="VehicleReleased" targetId="RouteChangeAcknowledged" />
+        <exclude sourceId="VehicleReleased" targetId="DeliveryRiskClosedAtArrival" />
+      </excludes>
+      <milestones>
+        <milestone sourceId="DispatcherDecisionRecorded" targetId="DeliveryRiskDetected" />
+        <milestone sourceId="DispatcherDecisionRecorded" targetId="VehicleReleased" />
+      </milestones>
+    </constraints>
+  </specification>
+  <runtime>
+    <marking>
+      <executed />
+      <included>
+        <event id="ShipmentDispatched" />
+        <event id="TransportStarted" />
+        <event id="JourneyStarted" />
+        <event id="ShipmentArrived" />
+        <event id="ReceiptAcknowledged" />
+        <event id="VehicleReleased" />
+        <event id="DeliveryRiskDetected" />
+      </included>
+      <pendingResponses>
+        <event id="ShipmentDispatched" />
+      </pendingResponses>
+    </marking>
+  </runtime>
+</dcrgraph>

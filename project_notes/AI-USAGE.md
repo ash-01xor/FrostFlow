@@ -69,3 +69,15 @@ The signed team contract requires a faithful declaration of actual prompts, tool
 **Ownership attribution:** at the user's explicit request, recorded Ashvanth as P1's responsible student in the task board, README/guide, BPMN documentation, model PDF and DCR title. Regenerated and inspected the attributed PDF, linted P1, preserved executable/logical semantics and recorded the attribution-only hash changes. Removed duplicate collaboration/review wording; P2–P6 remain unassigned and teammate review remains pending.
 
 **Publication preparation:** at the user's request, removed the student attribution from the P1 BPMN source/PDF, retained project ownership records and the DCR title, and regenerated the PDF. P1 BPMN source now exactly matches the engine-verified hash again. BPMN lint, 29 offline tests and Compose validation passed. Preserved the user's task-board edits and prepared the initial commit for the supplied FrostFlow GitHub remote.
+
+## 2026-11-14 — P2 Siddhi live verification and P2 DCR compliance
+
+**Tool:** Claude Code (Claude Opus 5.5).
+
+**Prompt summary (paraphrase):** Help implement the remaining P2 work in the `p2-updates` pull request: verify that the Siddhi app loads and that the live risk-alert and route-command flow completes, and deliver the outstanding P2 items.
+
+**Defects found and fixed:** (1) `ColdChainTelemetry.siddhi` never deployed. SiddhiQL requires all stream definitions before the first query, so the app was reordered. (2) The `http` and `http-service` sources cannot share port 8006, so route commands moved to 8007 (Compose updated). (3) GPS events lack ETA fields and were dropped by the JSON mapper; `fail.on.missing.attribute='false'` was added. (4) The `http-call-response` status regex `2\d+` is not unescaped by SiddhiQL and never matched, so it is now `200`. (5) Siddhi serialises a null `routeId` as `"undefined"`, which made the simulator reject `AcceptDelay`; the receiver now normalises it, with a regression test. (6) pyzeebe closed its gRPC channel after 10 failed calls while a fresh Zeebe was still starting; the client and worker now retry without that limit.
+
+**AI-produced output:** the fixes above; `stage_tests/check_p2_siddhi.py` (live two-shipment acceptance check); the P2 DCR graph, builder, real execution log, synthetic invalid traces and verification report under `compliance/p2/`; 5 new offline tests; documentation and task-board updates. Actual results: the live check passed on a fresh stack, both real traces were valid and accepting, all 4 invalid traces were rejected, and 40 offline tests passed under Python 3.12.16. ProcessDoctor, TomTom, the P3 receiver and an external simulator were **not** verified. Nothing was committed or pushed.
+
+**Human review pending:** Rahul to review the DCR rules against the intended P2 behaviour, rerun the live check, inspect the instances in Operate, and run the ProcessDoctor import.

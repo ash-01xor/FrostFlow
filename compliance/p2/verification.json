@@ -1,0 +1,109 @@
+{
+  "process": "P2 Transport and delivery",
+  "owner": "Rahul Shanbhag",
+  "verifiedAt": "2026-11-14T10:40:35.223662Z",
+  "environment": "Local Docker Compose stack: Zeebe/Operate 8.8.0, siddhiio/siddhi-runner-alpine (siddhi-io-http 2.2.0), communication service on Python 3.12; GPS_TICK_SECONDS=10; fresh dataset version 3",
+  "inputModes": {
+    "gps": "scripted-demo route points",
+    "eta": "local-demo-estimate (no TomTom key configured)",
+    "routeCommands": "Siddhi http-service bridge to the local scripted-simulator endpoint",
+    "receipt": "manual/test acknowledge-receipt endpoint (P3 receiver not yet implemented)"
+  },
+  "liveAcceptance": {
+    "command": "python stage_tests/check_p2_siddhi.py",
+    "result": "PASS",
+    "shipments": {
+      "S-SID-A-103759": {
+        "transportState": "COMPLETED",
+        "vehicleReleased": true,
+        "activities": [
+          "TransportStarted",
+          "JourneyStarted",
+          "DeliveryRiskDetected",
+          "DispatcherDecisionRecorded",
+          "RouteChangeAcknowledged",
+          "DeliveryRiskDetected",
+          "DispatcherDecisionRecorded",
+          "ShipmentArrived",
+          "ReceiptAcknowledged",
+          "VehicleReleased"
+        ]
+      },
+      "S-SID-B-103759": {
+        "transportState": "COMPLETED",
+        "vehicleReleased": true,
+        "activities": [
+          "TransportStarted",
+          "JourneyStarted",
+          "ShipmentArrived",
+          "ReceiptAcknowledged",
+          "VehicleReleased"
+        ]
+      },
+      "S-SID-C-103759": {
+        "transportState": "COMPLETED",
+        "vehicleReleased": true,
+        "activities": [
+          "TransportStarted",
+          "JourneyStarted",
+          "DeliveryRiskDetected",
+          "DeliveryRiskClosedAtArrival",
+          "ShipmentArrived",
+          "ReceiptAcknowledged",
+          "VehicleReleased"
+        ]
+      }
+    },
+    "riskAlertFromSiddhi": "SIDDHI:RISK:P2:S-SID-A-103759:ETAUpdated:0:1",
+    "routeChange": {
+      "from": "route-01",
+      "to": "route-02",
+      "acknowledgement": {
+        "commandId": "check-decision-SIDDHI:RISK:P2:S-SID-A-103759:ETAUpdated:0:1",
+        "messageId": "ea420f5f-182a-4a3f-a022-97ba02addea9",
+        "simulatorAcknowledged": true
+      }
+    },
+    "additionalAcceptedDelays": [
+      "SIDDHI:RISK:P2:S-SID-A-103759:ETAUpdated:1:1"
+    ],
+    "observations": [
+      "Siddhi app deployed with 0 errors; one COLD-CHAIN-RISK alert per late route revision for the short-deadline shipment, none for the generous-deadline shipment",
+      "Route-change acknowledgement carries Siddhi's http-service messageId, proving it returned through the bridge rather than the local fallback",
+      "Both shipments arrived automatically, stayed ARRIVED with vehicle reserved until receipt, then completed and released their vehicles",
+      "No failed Zeebe jobs or incidents during the run",
+      "Shipment C: no decision was made before the truck reached its destination; the 'Arrived before decision' branch recorded DeliveryRiskClosedAtArrival, kept route-01, and a later dispatcher decision was refused with HTTP 409 (race found during the manual CLI rehearsal on 2026-11-14 and fixed)"
+    ]
+  },
+  "offlineTests": {
+    "command": "python -m unittest discover -s stage_tests -p 'test_*.py'",
+    "python": "3.12.16",
+    "result": "41 tests OK"
+  },
+  "localCompliance": {
+    "command": "python compliance/check.py compliance/p2/execution-log.xes --model compliance/p2/rules.xml",
+    "result": "all 3 real traces valid and accepting",
+    "invalidTraces": "6 synthetic violations in invalid-traces.json all rejected",
+    "telemetryExcluded": "GPSPositionUpdated/ETAUpdated are sensor telemetry evaluated by Siddhi and are not business activities in the graph"
+  },
+  "processDoctor": "Checked 2026-11-14 at processdoctor.compute.dtu.dk: Conformance > Open DCR Solution XML (compliance/p2/rules.xml), Upload Log (compliance/p2/execution-log.xes, 3 traces | 3 variants), coverage threshold 100. Result: 3 Conforming, 0 Partially Violating, 0 Violating, 0 structural violations. Screenshot: compliance/p2/processdoctor-conforming.png",
+  "notVerified": [
+    "TomTom live ETA (needs the team API key)",
+    "Real P3 receiver for ShipmentArrived/ReceiptAcknowledged",
+    "External/physical simulator (only the local scripted simulator endpoint is exercised)"
+  ],
+  "sha256": {
+    "bpmn/transport.bpmn": "f4d2dcecde9d35e2050622a210664c46d312f45cb75aeb626e9ddf7949984ff7",
+    "siddhi-apps/ColdChainTelemetry.siddhi": "0d29e8435cc80bde667402db02e6bb6c2d121a627454a2c990045cd3362a8768",
+    "deployer/app.py": "a67fde9f27d947eceb9a9e3856078bb30298abdc28dd39461dbafa351f9d48b5",
+    "deployer/registry.py": "57f0b97e5301e5ea4ed0110d99399eb3622ab624998e6effd77429fd2f5c23cc",
+    "deployer/transport_integrations.py": "4e0a46d428c0adb89cb2bc7640589e42e25720f50a5b349e3efde33bbb3980e9",
+    "docker-compose.yml": "e2037d81bd23399a816c222a4cbf81aaed472f7e2b89b8849eca402c5e8b69f5",
+    "stage_tests/check_p2_siddhi.py": "514053d902c719041983297fb0b79144730ba3c3cec6d0a0464059859f6ee548",
+    "compliance/check.py": "eb2421c8b29795b39e2e415b75abd560c1448749211af4083bca989a270fe2e6",
+    "compliance/p2/rules.xml": "d93d0a9d04e47403a96b53ad0e20b495ddac09430cf2bd823a833bfbe804f1e8",
+    "compliance/p2/execution-log.xes": "fe3f152db3d61177632690354546f832c5d002be7d5a3e5a299380039d6c5044",
+    "compliance/p2/invalid-traces.json": "3a62b71a7bdbe7bd1a7d98f7de595a18fb1a2f68d5d719b2b7fd4f88f937f7bb"
+  },
+  "bpmnLint": "Not run in this session (npx download not permitted); run npx --yes @camunda8/cli@4.6.1 bpmn lint bpmn/transport.bpmn. Zeebe accepted the model at deployment."
+}

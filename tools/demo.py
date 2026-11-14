@@ -1,4 +1,4 @@
-"""Interactive demonstration controls for the manual-input P1/P2 workflow.
+"""Interactive demonstration controls for the P1/P2 transport workflow.
 
 Uses the application's HTTP API; no Docker commands or data resets are performed.
 Run from the repository root: python tools/demo.py
@@ -68,6 +68,11 @@ def show(record):
         print(f"Dispatch handoff: {record.get('handoffStatus')}")
         print(f"P2 transport state: {record.get('transportState', 'not started')}")
         print(f"Vehicle released: {record.get('vehicleReleased', False)}")
+        print(f"Current route: {record.get('routeId')}")
+        if record.get("currentPosition"):
+            print(f"Current position: {record['currentPosition']} | ETA: {record.get('eta')} ({record.get('etaSource')})")
+        if record.get("pendingDeliveryRisk"):
+            print(f"Dispatcher decision pending for alert: {record['pendingDeliveryRisk']}")
     if record.get("pendingCommand"):
         print("The accepted action is still being processed.")
     hint = TRANSPORT_LOCATIONS.get(record.get("transportState")) or LOCATIONS.get(
@@ -94,7 +99,7 @@ def manual_event_time(base, shipment_id, minutes_after_creation):
     return occurred_at.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
 
 
-def wait_for_action(base, shipment_id, action, old_wait_key=None):
+def wait_for_action(base, shipment_id, action, old_wait_key=None, target_route_id=None):
     end = time.monotonic() + 45
     while time.monotonic() < end:
         status, record = http(base, f"/shipments/{shipment_id}")
@@ -113,6 +118,26 @@ def wait_for_action(base, shipment_id, action, old_wait_key=None):
                 record.get("transportState") == "COMPLETED"
                 and record.get("vehicleReleased") is True
             )
+        elif action == "delivery-risk":
+            finished = bool(record.get("pendingDeliveryRisk")) or record.get(
+                "transportState"
+            ) in ("ARRIVED", "COMPLETED")
+        elif action == "dispatcher-decision":
+            if target_route_id:
+                event_status, events = http(base, f"/shipments/{shipment_id}/events")
+                finished = (
+                    not record.get("pendingDeliveryRisk")
+                    and record.get("routeId") == target_route_id
+                    and record.get("routeIndex", 0) >= 1
+                    and event_status == 200
+                    and any(
+                        event.get("eventType") == "RouteChangeAcknowledged"
+                        and event.get("payload", {}).get("routeId") == target_route_id
+                        for event in events
+                    )
+                )
+            else:
+                finished = not record.get("pendingDeliveryRisk")
         elif action == "cancel":
             finished = record["state"] == "CANCELLED"
         else:
@@ -155,7 +180,7 @@ def inventory(base):
     return stock
 
 
-def perform(base, choice):
+def perform(base, choice, deadline_minutes=60):
     if choice == "8":
         inventory(base)
         return
@@ -182,7 +207,9 @@ def perform(base, choice):
         product = stock["products"][int(selected) - 1]
         action = "create"
         path = "/shipments"
-        deadline = (datetime.now(timezone.utc) + timedelta(hours=1)).isoformat()
+        deadline = (
+            datetime.now(timezone.utc) + timedelta(minutes=deadline_minutes)
+        ).isoformat()
         data = dict(
             shipmentId=shipment_id,
             journeyId="journey-" + shipment_id,
@@ -194,7 +221,7 @@ def perform(base, choice):
             batchId=product["batchId"],
             deliveryDeadline=deadline,
         )
-    elif choice in ("9", "10"):
+    elif choice in ("9", "10", "11", "12", "13"):
         status, record = http(base, path)
         if status != 200:
             print("Not available:", record.get("error"))
@@ -206,7 +233,7 @@ def perform(base, choice):
                 "occurredAt": manual_event_time(base, shipment_id, 5),
                 "recipientId": record["recipientId"],
             }
-        else:
+        elif choice == "10":
             action = "acknowledge-receipt"
             data = {
                 "eventId": f"demo-receipt-{shipment_id}",
@@ -215,6 +242,41 @@ def perform(base, choice):
                 "quantityReceived": record["quantity"],
                 "receiptReference": f"DEMO-{shipment_id}",
             }
+        elif choice == "11":
+            action = "delivery-risk"
+            status, events = http(base, path + "/events")
+            if status != 200:
+                raise RuntimeError(events.get("error", "Cannot read shipment events"))
+            episode = 1 + sum(event.get("eventType") == "DeliveryRiskDetected" for event in events)
+            deadline = datetime.fromisoformat(record["deliveryDeadline"].replace("Z", "+00:00"))
+            eta = (deadline + timedelta(seconds=3600)).astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
+            data = {
+                "shipmentId": shipment_id,
+                "eventId": f"demo-risk-{record['journeyId']}-episode-{episode}",
+                "occurredAt": manual_event_time(base, shipment_id, 20 + episode),
+                "eta": eta,
+                "deliveryDeadline": record["deliveryDeadline"],
+                "reason": "CLI simulated delivery delay",
+                "estimatedDelaySeconds": 3600,
+            }
+            path = "/integrations/siddhi/delivery-risk"
+        else:
+            action = "dispatcher-decision"
+            status, events = http(base, path + "/events")
+            if status != 200:
+                raise RuntimeError(events.get("error", "Cannot read shipment events"))
+            latest_risk = next(
+                (event.get("producerEventId") or event.get("eventId")
+                 for event in reversed(events)
+                 if event.get("eventType") == "DeliveryRiskDetected"),
+                record["journeyId"],
+            )
+            data = {"eventId": f"demo-decision-{record.get('pendingDeliveryRisk') or latest_risk}"}
+            if choice == "12":
+                data["decision"] = "ACCEPT_DELAY"
+            else:
+                data["decision"] = "APPROVE_ALTERNATIVE_ROUTE"
+                data["routeId"] = input("Alternative route [route-01/route-02/route-03]: ").strip()
     else:
         action = {
             "3": "verify-loading",
@@ -247,7 +309,7 @@ def perform(base, choice):
             print(
                 f"Recording 5 crates of {record['productName']} for batch {record['batchId']}."
             )
-    if choice != "1":
+    if choice not in ("1", "11"):
         path += "/" + action
     status, response = http(base, path, data)
     if status != 202:
@@ -258,18 +320,27 @@ def perform(base, choice):
             )
         return
     print("Action accepted. Waiting for the workflow to process it...")
-    wait_for_action(base, shipment_id, action, old_wait_key)
+    wait_for_action(
+        base, shipment_id, action, old_wait_key,
+        target_route_id=data.get("routeId") if choice == "13" else None,
+    )
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--base-url", default="http://localhost:5001")
     parser.add_argument(
+        "--deadline-minutes", type=int, default=60,
+        help="delivery deadline offset for new demo shipments (short values trigger Siddhi risk)",
+    )
+    parser.add_argument(
         "--check",
         action="store_true",
         help="Check readiness and inventory without changing data",
     )
     args = parser.parse_args()
+    if args.deadline_minutes <= 0:
+        parser.error("--deadline-minutes must be greater than zero")
     base = args.base_url.rstrip("/")
     try:
         status, health = http(base, "/health")
@@ -296,15 +367,16 @@ def main():
             )
             print("5 Replenish 5 crates      6 Cancel a stock-waiting shipment")
             print("7 Show activity history  8 Show product inventory")
-            print("9 Record manual arrival 10 Acknowledge receipt 0 Exit")
+            print("9 Force manual arrival 10 Acknowledge receipt 0 Exit")
+            print("11 Simulate delivery risk 12 Accept delay 13 Approve route change")
             choice = input("Action: ").strip()
             if choice == "0":
                 return 0
-            if choice not in {str(value) for value in range(1, 11)}:
-                print("Choose an action from 0 to 10.")
+            if choice not in {str(value) for value in range(1, 14)}:
+                print("Choose an action from 0 to 13.")
                 continue
             try:
-                perform(base, choice)
+                perform(base, choice, args.deadline_minutes)
             except (ValueError, RuntimeError) as error:
                 print("Cannot perform action:", error)
     except (URLError, TimeoutError, OSError, RuntimeError) as error:
