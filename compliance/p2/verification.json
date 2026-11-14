@@ -86,7 +86,7 @@
     "invalidTraces": "6 synthetic violations in invalid-traces.json all rejected",
     "telemetryExcluded": "GPSPositionUpdated/ETAUpdated are sensor telemetry evaluated by Siddhi and are not business activities in the graph"
   },
-  "processDoctor": "Not run yet; import rules.xml and execution-log.xes at processdoctor.compute.dtu.dk and record the result here",
+  "processDoctor": "Checked 2026-11-14 at processdoctor.compute.dtu.dk: Conformance > Open DCR Solution XML (compliance/p2/rules.xml), Upload Log (compliance/p2/execution-log.xes, 3 traces | 3 variants), coverage threshold 100. Result: 3 Conforming, 0 Partially Violating, 0 Violating, 0 structural violations. Screenshot: compliance/p2/processdoctor-conforming.png",
   "notVerified": [
     "TomTom live ETA (needs the team API key)",
     "Real P3 receiver for ShipmentArrived/ReceiptAcknowledged",

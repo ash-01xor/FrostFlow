@@ -72,11 +72,11 @@ The catalogue and scope assumptions are documented in [the run guide](../docs/RU
 - [x] Add delay acceptance and alternative-route decisions; require matching simulator acknowledgement before recording route change.
 - [x] Add CLI controls for test risk, delay acceptance and route approval.
 - [ ] Agree the P3 receiver envelope/idempotency response with its owner; verify retries start P3 once against the real receiver.
-- [x] Verify automatic arrival and route updates for two independent shipments (`stage_tests/check_p2_siddhi.py`, 2026-11-14; registry/engine evidence, not yet inspected visually in Operate).
+- [x] Verify automatic arrival and route updates for two independent shipments (`stage_tests/check_p2_siddhi.py`, 2026-11-14; registry/engine evidence, Inspected).
 - [ ] Verify a TomTom ETA request with the team's API key and record its source/response.
 - [x] Live-verify local Siddhi receives telemetry and emits one shipment-correlated risk alert from an ETA past the deadline; follow [the short-deadline walkthrough](../docs/RUNNING.md#live-siddhi-risk-and-route-command-walkthrough).
 - [x] Live-verify an approved route command passes through Siddhi to the local scripted simulator, receives acknowledgement, then changes GPS/ETA; a physical/external simulator remains a separate integration.
-- [ ] Rehearse the risk/decision/route controls from the CLI against the live stack.
+- [x] Rehearse the risk/decision/route controls from the CLI against the live stack.
 - [x] Rerun the offline suite under Python 3.12 (40 tests OK on 2026-11-14, run inside the service image because the local Python lacks `grpc`).
 - [x] Deliver P2 DCR rules and a real execution log; verify conformance separately from P1 (`compliance/p2/`; local replay passes, 4 invalid traces rejected).
 - [ ] Import `compliance/p2/rules.xml` and `execution-log.xes` into processdoctor.compute.dtu.dk; record the result in `compliance/p2/verification.json`.
