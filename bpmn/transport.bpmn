@@ -42,8 +42,18 @@
       <bpmn:incoming>Flow_8</bpmn:incoming>
       <bpmn:outgoing>Flow_9</bpmn:outgoing>
     </bpmn:serviceTask>
-    <bpmn:intermediateCatchEvent id="WaitForDispatcherDecision" name="Wait for dispatcher decision">
+    <bpmn:eventBasedGateway id="DecisionOrArrival" name="Wait for decision or arrival">
       <bpmn:incoming>Flow_9</bpmn:incoming>
+      <bpmn:outgoing>Flow_9a</bpmn:outgoing>
+      <bpmn:outgoing>Flow_9b</bpmn:outgoing>
+    </bpmn:eventBasedGateway>
+    <bpmn:intermediateCatchEvent id="WaitForArrivalDuringDecision" name="Arrived before decision">
+      <bpmn:incoming>Flow_9b</bpmn:incoming>
+      <bpmn:outgoing>Flow_9c</bpmn:outgoing>
+      <bpmn:messageEventDefinition id="WaitForArrivalDuringDecisionDefinition" messageRef="Message_ShipmentArrived" />
+    </bpmn:intermediateCatchEvent>
+    <bpmn:intermediateCatchEvent id="WaitForDispatcherDecision" name="Wait for dispatcher decision">
+      <bpmn:incoming>Flow_9a</bpmn:incoming>
       <bpmn:outgoing>Flow_10</bpmn:outgoing>
       <bpmn:messageEventDefinition id="WaitForDispatcherDecisionDefinition" messageRef="Message_DispatcherDecisionRecorded" />
     </bpmn:intermediateCatchEvent>
@@ -59,6 +69,7 @@
         <zeebe:taskDefinition type="p2-record-arrival" retries="3" />
       </bpmn:extensionElements>
       <bpmn:incoming>Flow_4</bpmn:incoming>
+      <bpmn:incoming>Flow_9c</bpmn:incoming>
       <bpmn:outgoing>Flow_5</bpmn:outgoing>
     </bpmn:serviceTask>
     <bpmn:intermediateCatchEvent id="WaitForReceiptAcknowledged" name="Wait for receipt acknowledgement">
@@ -82,7 +93,10 @@
     <bpmn:sequenceFlow id="Flow_3a" sourceRef="JourneyEvents" targetRef="WaitForShipmentArrived" />
     <bpmn:sequenceFlow id="Flow_3b" sourceRef="JourneyEvents" targetRef="WaitForDeliveryRisk" />
     <bpmn:sequenceFlow id="Flow_8" sourceRef="WaitForDeliveryRisk" targetRef="RecordDeliveryRisk" />
-    <bpmn:sequenceFlow id="Flow_9" sourceRef="RecordDeliveryRisk" targetRef="WaitForDispatcherDecision" />
+    <bpmn:sequenceFlow id="Flow_9" sourceRef="RecordDeliveryRisk" targetRef="DecisionOrArrival" />
+    <bpmn:sequenceFlow id="Flow_9a" sourceRef="DecisionOrArrival" targetRef="WaitForDispatcherDecision" />
+    <bpmn:sequenceFlow id="Flow_9b" sourceRef="DecisionOrArrival" targetRef="WaitForArrivalDuringDecision" />
+    <bpmn:sequenceFlow id="Flow_9c" sourceRef="WaitForArrivalDuringDecision" targetRef="RecordArrival" />
     <bpmn:sequenceFlow id="Flow_10" sourceRef="WaitForDispatcherDecision" targetRef="ApplyDispatcherDecision" />
     <bpmn:sequenceFlow id="Flow_11" sourceRef="ApplyDispatcherDecision" targetRef="JourneyEvents" />
     <bpmn:sequenceFlow id="Flow_4" sourceRef="WaitForShipmentArrived" targetRef="RecordArrival" />
@@ -145,8 +159,16 @@
         <dc:Bounds x="640" y="260" width="110" height="80" /><bpmndi:BPMNLabel />
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="WaitForDispatcherDecision_di" bpmnElement="WaitForDispatcherDecision">
-        <dc:Bounds x="800" y="282" width="36" height="36" />
-        <bpmndi:BPMNLabel><dc:Bounds x="765" y="322" width="110" height="30" /></bpmndi:BPMNLabel>
+        <dc:Bounds x="846" y="282" width="36" height="36" />
+        <bpmndi:BPMNLabel><dc:Bounds x="811" y="322" width="90" height="40" /></bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DecisionOrArrival_di" bpmnElement="DecisionOrArrival">
+        <dc:Bounds x="776" y="280" width="40" height="40" />
+        <bpmndi:BPMNLabel><dc:Bounds x="740" y="325" width="80" height="40" /></bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="WaitForArrivalDuringDecision_di" bpmnElement="WaitForArrivalDuringDecision">
+        <dc:Bounds x="778" y="206" width="36" height="36" />
+        <bpmndi:BPMNLabel><dc:Bounds x="820" y="210" width="90" height="30" /></bpmndi:BPMNLabel>
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="ApplyDispatcherDecision_di" bpmnElement="ApplyDispatcherDecision">
         <dc:Bounds x="900" y="260" width="120" height="80" /><bpmndi:BPMNLabel />
@@ -186,8 +208,11 @@
       <bpmndi:BPMNEdge id="Flow_3a_di" bpmnElement="Flow_3a"><di:waypoint x="580" y="150" /><di:waypoint x="620" y="150" /></bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="Flow_3b_di" bpmnElement="Flow_3b"><di:waypoint x="560" y="170" /><di:waypoint x="560" y="280" /></bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="Flow_8_di" bpmnElement="Flow_8"><di:waypoint x="578" y="298" /><di:waypoint x="640" y="298" /></bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="Flow_9_di" bpmnElement="Flow_9"><di:waypoint x="750" y="300" /><di:waypoint x="800" y="300" /></bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="Flow_10_di" bpmnElement="Flow_10"><di:waypoint x="836" y="300" /><di:waypoint x="900" y="300" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_9_di" bpmnElement="Flow_9"><di:waypoint x="750" y="300" /><di:waypoint x="776" y="300" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_9a_di" bpmnElement="Flow_9a"><di:waypoint x="816" y="300" /><di:waypoint x="846" y="300" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_9b_di" bpmnElement="Flow_9b"><di:waypoint x="796" y="280" /><di:waypoint x="796" y="242" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_9c_di" bpmnElement="Flow_9c"><di:waypoint x="778" y="224" /><di:waypoint x="740" y="224" /><di:waypoint x="740" y="190" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_10_di" bpmnElement="Flow_10"><di:waypoint x="882" y="300" /><di:waypoint x="900" y="300" /></bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="Flow_11_di" bpmnElement="Flow_11"><di:waypoint x="1020" y="300" /><di:waypoint x="560" y="300" /><di:waypoint x="560" y="170" /></bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="Flow_4_di" bpmnElement="Flow_4">
         <di:waypoint x="616" y="150" />

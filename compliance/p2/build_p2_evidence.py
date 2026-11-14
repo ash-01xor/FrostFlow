@@ -35,6 +35,7 @@ EVENTS = [
     ("DeliveryRiskDetected", 580, 340),
     ("DispatcherDecisionRecorded", 840, 340),
     ("RouteChangeAcknowledged", 1100, 340),
+    ("DeliveryRiskClosedAtArrival", 840, 620),
 ]
 NAMES = [name for name, _, _ in EVENTS]
 TELEMETRY = {"GPSPositionUpdated", "ETAUpdated"}
@@ -49,6 +50,7 @@ CONDITIONS = [
     ("ReceiptAcknowledged", "VehicleReleased"),
     ("DeliveryRiskDetected", "DispatcherDecisionRecorded"),
     ("DispatcherDecisionRecorded", "RouteChangeAcknowledged"),
+    ("DeliveryRiskDetected", "DeliveryRiskClosedAtArrival"),
 ]
 RESPONSES = [
     ("ShipmentDispatched", "TransportStarted"),
@@ -62,10 +64,12 @@ INCLUDES = [
     ("DeliveryRiskDetected", "DispatcherDecisionRecorded"),
     # ...and only a decision makes a route-change acknowledgement possible.
     ("DispatcherDecisionRecorded", "RouteChangeAcknowledged"),
+    # Arrival before a decision closes the alert instead (recorded just before arrival).
+    ("DeliveryRiskDetected", "DeliveryRiskClosedAtArrival"),
 ]
 ONCE = ["ShipmentDispatched", "TransportStarted", "JourneyStarted", "ShipmentArrived",
         "ReceiptAcknowledged", "VehicleReleased", "DispatcherDecisionRecorded",
-        "RouteChangeAcknowledged"]
+        "RouteChangeAcknowledged", "DeliveryRiskClosedAtArrival"]
 EXCLUDES = [(name, name) for name in ONCE] + [
     # A new alert invalidates any route acknowledgement left from an older decision.
     ("DeliveryRiskDetected", "RouteChangeAcknowledged"),
@@ -73,6 +77,10 @@ EXCLUDES = [(name, name) for name in ONCE] + [
     ("ShipmentArrived", "DeliveryRiskDetected"),
     ("ShipmentArrived", "DispatcherDecisionRecorded"),
     ("ShipmentArrived", "RouteChangeAcknowledged"),
+    ("ShipmentArrived", "DeliveryRiskClosedAtArrival"),
+    # A decision and an arrival-closure are alternative outcomes of one alert.
+    ("DispatcherDecisionRecorded", "DeliveryRiskClosedAtArrival"),
+    ("DeliveryRiskClosedAtArrival", "DispatcherDecisionRecorded"),
 ] + [("VehicleReleased", name) for name in NAMES if name != "VehicleReleased"]
 MILESTONES = [
     # No second alert is accepted while a decision is still pending.
@@ -81,7 +89,8 @@ MILESTONES = [
     ("DispatcherDecisionRecorded", "VehicleReleased"),
 ]
 INITIAL_INCLUDED = [n for n in NAMES
-                    if n not in ("DispatcherDecisionRecorded", "RouteChangeAcknowledged")]
+                    if n not in ("DispatcherDecisionRecorded", "RouteChangeAcknowledged",
+                                  "DeliveryRiskClosedAtArrival")]
 INITIAL_PENDING = ["ShipmentDispatched"]
 
 

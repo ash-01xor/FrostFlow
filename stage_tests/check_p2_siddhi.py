@@ -186,10 +186,27 @@ def main():
     assert not any(e["eventType"] == "DeliveryRiskDetected" for e in b_events), "B raised a risk"
     print("Both transports completed after receipt; vehicles released")
 
+    # 5. C: nobody decides before the truck reaches its destination. Arrival must
+    #    close the alert, and a late decision must be refused (no route change).
+    c = f"S-SID-C-{run}"
+    prepare(c, "V-01", "C-03", "route-01", products[2], utc(timedelta(minutes=1)))
+    wait("Siddhi risk alert for C", lambda: get(c).get("pendingDeliveryRisk"))
+    arrived_c = wait("C arrival without a decision", lambda: (
+        lambda r: r if r.get("transportState") == "ARRIVED" else None)(get(c)), timeout=180)
+    c_types = [e["eventType"] for e in events(c)]
+    assert "DeliveryRiskClosedAtArrival" in c_types, c_types
+    assert "DispatcherDecisionRecorded" not in c_types and "RouteChangeAcknowledged" not in c_types, c_types
+    assert arrived_c["routeId"] == "route-01" and not arrived_c.get("pendingDeliveryRisk"), arrived_c
+    status, refused = http(f"/shipments/{c}/dispatcher-decision", dict(
+        eventId="check-late-decision", decision="APPROVE_ALTERNATIVE_ROUTE", routeId="route-02"))
+    assert status == 409, (status, refused)
+    completed[c] = acknowledge_receipt(get(c))
+    print("C: arrival closed the undecided alert; late decision refused (409)")
+
     evidence = {
         "checkedAt": utc(),
         "health": health,
-        "shipments": {s: {"record": completed[s], "events": events(s)} for s in (a, b)},
+        "shipments": {s: {"record": completed[s], "events": events(s)} for s in completed},
         "riskAlertFromSiddhi": risk_id,
         "routeChange": {"from": before["routeId"], "to": target, "acknowledgement": ack},
         "additionalAcceptedDelays": accepted,

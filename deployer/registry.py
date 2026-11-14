@@ -880,6 +880,13 @@ class Registry:
                 if accepted["event"]["eventId"] == event_id and accepted["event"]["decision"] == decision and accepted["event"].get("routeId") == route_id:
                     return accepted
                 raise Conflict("a dispatcher decision is already accepted for this alert")
+            if db.execute(
+                "SELECT 1 FROM results WHERE id=?",
+                (f"transport-input:{shipment_id}:ShipmentArrived",),
+            ).fetchone():
+                # The vehicle is already at its destination; P2 closes this alert
+                # when it records the arrival instead of applying a late decision.
+                raise Conflict("vehicle has already arrived; arrival closes this delivery-risk alert")
             if decision not in ("ACCEPT_DELAY", "APPROVE_ALTERNATIVE_ROUTE"):
                 raise ValueError("decision must be ACCEPT_DELAY or APPROVE_ALTERNATIVE_ROUTE")
             if decision == "APPROVE_ALTERNATIVE_ROUTE":

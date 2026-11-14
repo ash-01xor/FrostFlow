@@ -604,6 +604,35 @@ class Preparation(unittest.TestCase):
                                   json={"event": {**command, "routeId": "route-02"}})
         self.assertIn(rejected.status_code, (400, 409))
 
+    def test_arrival_during_pending_decision_closes_alert(self):
+        """The truck reaches its destination before the dispatcher decides."""
+        self.start_p2_transport()
+        self.assertEqual(self.http.post("/integrations/siddhi/delivery-risk", json={
+            "shipmentId": "S-test", "eventId": "SIDDHI:RISK:late-1",
+            "occurredAt": "2026-12-01T10:20:00Z", "eta": "2026-12-01T12:00:00Z",
+            "deliveryDeadline": "2026-12-01T11:00:00Z", "reason": "late",
+        }).status_code, 202)
+        risk = next(item for item in self.db.pending_messages(destination="zeebe")
+                    if item["name"] == "DeliveryRiskDetected")["variables"]["deliveryRiskEvent"]
+        self.db.record_delivery_risk("S-test", 999, risk)
+        arrival = self.db.queue_transport_event(
+            "S-test", "ShipmentArrived", "SIM:J-test:ShipmentArrived",
+            "2026-12-01T10:30:00Z", {"recipientId": "C-01"},
+            source="p2-simulator", input_mode="simulated",
+        )
+        late = self.http.post("/shipments/S-test/dispatcher-decision", json={
+            "eventId": "late-decision", "decision": "APPROVE_ALTERNATIVE_ROUTE",
+            "routeId": "route-02"})
+        self.assertEqual(late.status_code, 409, late.json)
+        self.assertIn("already arrived", late.json["error"])
+        record = self.db.record_arrival("S-test", 999, arrival["event"])
+        self.assertEqual(record["transportState"], "ARRIVED")
+        self.assertEqual(record["routeId"], "route-01")
+        self.assertIsNone(record.get("pendingDeliveryRisk"))
+        types = [event["eventType"] for event in self.db.events("S-test")]
+        self.assertLess(types.index("DeliveryRiskClosedAtArrival"), types.index("ShipmentArrived"))
+        self.assertNotIn("RouteChangeAcknowledged", types)
+
     def test_p2_manual_event_rejects_invalid_time_and_mismatched_receipt(self):
         unknown_arrival = self.http.post(
             "/shipments/not-known/arrive",
@@ -1098,7 +1127,7 @@ class P2Compliance(unittest.TestCase):
 
         data = json.loads((self.P2 / "invalid-traces.json").read_text())
         traces = {k: v for k, v in data.items() if isinstance(v, list)}
-        self.assertEqual(len(traces), 4)
+        self.assertEqual(len(traces), 6)
         for case, events in traces.items():
             with self.subTest(case=case):
                 self.assertFalse(replay(self.P2 / "rules.xml", events)["valid"])

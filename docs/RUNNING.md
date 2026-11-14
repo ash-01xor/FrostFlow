@@ -371,6 +371,8 @@ In the CLI, create a shipment with **1**, verify loading with **3**, then dispat
 
 Option **11** remains a manual test alert and bypasses Siddhi's risk detection; do not use it for this walkthrough. A local route-command acknowledgement verifies the Siddhi-to-scripted-simulator path only. It does not prove integration with a physical/external simulator. P3 delivery remains separate outstanding work.
 
+**Decide before the truck arrives.** While a decision is pending, the scripted truck keeps moving: about four GPS ticks per route, so roughly 60 s at `GPS_TICK_SECONDS=15`. If it reaches its destination first, P2 takes the **Arrived before decision** branch. The alert is closed (`DeliveryRiskClosedAtArrival`), the route is unchanged, and a later option **12**/**13** is refused with *vehicle has already arrived*. That is the intended outcome, not a failure. After an approved route change, the deadline has usually already passed, so expect a second alert on the new route revision and answer it too.
+
 Siddhi listens on two ports: **8006** for telemetry and **8007** for route commands. Its `http` and `http-service` sources cannot share one listener. If an alert is missing, check `docker compose logs siddhi` for `Siddhi App ColdChainTelemetry deployed successfully` first.
 
 **Automated live check.** Instead of driving the CLI, run the same flow unattended on a fresh dataset:
@@ -382,11 +384,11 @@ docker compose -p cold-chain-p2-siddhi-check up --build -d --wait --wait-timeout
 python stage_tests/check_p2_siddhi.py
 ```
 
-It dispatches two shipments at once. A has a one-minute deadline: Siddhi must raise the alert, an approved route change must be acknowledged through Siddhi, and later GPS/ETA must use the new route revision. A second late ETA on that revision is answered with an accepted delay. B has a 60-minute deadline and must raise no alert. Both must stay `ARRIVED` with their vehicle reserved until receipt, then complete. Evidence is written to `runtime/verification-results/p2-siddhi.json`. The reviewed result is in [compliance/p2/verification.json](../compliance/p2/verification.json).
+It dispatches two shipments at once. A has a one-minute deadline: Siddhi must raise the alert, an approved route change must be acknowledged through Siddhi, and later GPS/ETA must use the new route revision. A second late ETA on that revision is answered with an accepted delay. B has a 60-minute deadline and must raise no alert. C then gets an alert that is deliberately left undecided: its arrival must close the alert, and a late decision must be refused. Both must stay `ARRIVED` with their vehicle reserved until receipt, then complete. Evidence is written to `runtime/verification-results/p2-siddhi.json`. The reviewed result is in [compliance/p2/verification.json](../compliance/p2/verification.json).
 
 ### P2 DCR compliance
 
-[compliance/p2/rules.xml](../compliance/p2/rules.xml) checks P2's recorded activities, plus the neighbouring P1 `ShipmentDispatched`. `VehicleReleased` has `ReceiptAcknowledged` as a condition. A `DeliveryRiskDetected` alert includes a `DispatcherDecisionRecorded` response and makes it pending. That pending decision is a milestone blocking a second alert and the vehicle release. `RouteChangeAcknowledged` is only included by a decision. Arrival excludes all further risk activity, so an undecided alert that arrival supersedes is not owed. GPS/ETA telemetry is sensor data for Siddhi and is left out of the log.
+[compliance/p2/rules.xml](../compliance/p2/rules.xml) checks P2's recorded activities, plus the neighbouring P1 `ShipmentDispatched`. `VehicleReleased` has `ReceiptAcknowledged` as a condition. A `DeliveryRiskDetected` alert includes a `DispatcherDecisionRecorded` response and makes it pending. That pending decision is a milestone blocking a second alert and the vehicle release. `RouteChangeAcknowledged` is only included by a decision. If the truck arrives before a decision, P2 records `DeliveryRiskClosedAtArrival` just before `ShipmentArrived`. It is an alternative to the decision: each excludes the other, and it clears the pending obligation. Arrival then excludes all further risk activity. GPS/ETA telemetry is sensor data for Siddhi and is left out of the log.
 
 ```bash
 python compliance/check.py compliance/p2/execution-log.xes --model compliance/p2/rules.xml

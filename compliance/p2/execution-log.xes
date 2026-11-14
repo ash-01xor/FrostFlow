@@ -3,7 +3,7 @@
   <extension name="Concept" prefix="concept" uri="http://www.xes-standard.org/concept.xesext" />
   <extension name="Time" prefix="time" uri="http://www.xes-standard.org/time.xesext" />
   <trace>
-    <string key="concept:name" value="S-SID-A-100420" />
+    <string key="concept:name" value="S-SID-A-103759" />
     <string key="productId" value="PRD-001" />
     <string key="productName" value="Fresh milk" />
     <string key="batchId" value="DEMO-MILK-001" />
@@ -12,116 +12,116 @@
     <event>
       <string key="concept:name" value="ShipmentDispatched" />
       <string key="org:resource" value="dispatcher-check" />
-      <string key="eventId" value="P1:S-SID-A-100420:ShipmentDispatched" />
-      <string key="processInstanceKey" value="2251799813685310" />
+      <string key="eventId" value="P1:S-SID-A-103759:ShipmentDispatched" />
+      <string key="processInstanceKey" value="2251799813685322" />
       <string key="productId" value="PRD-001" />
       <string key="batchId" value="DEMO-MILK-001" />
       <string key="quantityUnit" value="crate" />
-      <date key="time:timestamp" value="2026-11-14T10:04:32.041305Z" />
+      <date key="time:timestamp" value="2026-11-14T10:38:11.496424Z" />
     </event>
     <event>
       <string key="concept:name" value="TransportStarted" />
       <string key="org:resource" value="system" />
-      <string key="eventId" value="P2:S-SID-A-100420:TransportStarted" />
-      <string key="processInstanceKey" value="2251799813685378" />
+      <string key="eventId" value="P2:S-SID-A-103759:TransportStarted" />
+      <string key="processInstanceKey" value="2251799813685389" />
       <string key="productId" value="PRD-001" />
       <string key="batchId" value="DEMO-MILK-001" />
       <string key="quantityUnit" value="crate" />
-      <date key="time:timestamp" value="2026-11-14T10:04:33.147103Z" />
+      <date key="time:timestamp" value="2026-11-14T10:38:12.625106Z" />
     </event>
     <event>
       <string key="concept:name" value="JourneyStarted" />
       <string key="org:resource" value="system" />
-      <string key="eventId" value="P2:S-SID-A-100420:JourneyStarted" />
-      <string key="processInstanceKey" value="2251799813685378" />
+      <string key="eventId" value="P2:S-SID-A-103759:JourneyStarted" />
+      <string key="processInstanceKey" value="2251799813685389" />
       <string key="productId" value="PRD-001" />
       <string key="batchId" value="DEMO-MILK-001" />
       <string key="quantityUnit" value="crate" />
-      <date key="time:timestamp" value="2026-11-14T10:04:33.295328Z" />
+      <date key="time:timestamp" value="2026-11-14T10:38:12.741827Z" />
     </event>
     <event>
       <string key="concept:name" value="DeliveryRiskDetected" />
       <string key="org:resource" value="system" />
-      <string key="eventId" value="P2:S-SID-A-100420:DeliveryRiskDetected:SIDDHI:RISK:P2:S-SID-A-100420:ETAUpdated:0:1" />
-      <string key="processInstanceKey" value="2251799813685378" />
+      <string key="eventId" value="P2:S-SID-A-103759:DeliveryRiskDetected:SIDDHI:RISK:P2:S-SID-A-103759:ETAUpdated:0:1" />
+      <string key="processInstanceKey" value="2251799813685389" />
       <string key="productId" value="PRD-001" />
       <string key="batchId" value="DEMO-MILK-001" />
       <string key="quantityUnit" value="crate" />
-      <date key="time:timestamp" value="2026-11-14T10:04:36.136462Z" />
+      <date key="time:timestamp" value="2026-11-14T10:38:20.595339Z" />
     </event>
     <event>
       <string key="concept:name" value="DispatcherDecisionRecorded" />
       <string key="org:resource" value="system" />
-      <string key="eventId" value="P2:S-SID-A-100420:DispatcherDecision:check-decision-SIDDHI:RISK:P2:S-SID-A-100420:ETAUpdated:0:1" />
-      <string key="processInstanceKey" value="2251799813685378" />
+      <string key="eventId" value="P2:S-SID-A-103759:DispatcherDecision:check-decision-SIDDHI:RISK:P2:S-SID-A-103759:ETAUpdated:0:1" />
+      <string key="processInstanceKey" value="2251799813685389" />
       <string key="productId" value="PRD-001" />
       <string key="batchId" value="DEMO-MILK-001" />
       <string key="quantityUnit" value="crate" />
-      <date key="time:timestamp" value="2026-11-14T10:04:55.919776Z" />
+      <date key="time:timestamp" value="2026-11-14T10:38:34.419420Z" />
     </event>
     <event>
       <string key="concept:name" value="RouteChangeAcknowledged" />
       <string key="org:resource" value="system" />
-      <string key="eventId" value="P2:S-SID-A-100420:RouteChangeAcknowledged:check-decision-SIDDHI:RISK:P2:S-SID-A-100420:ETAUpdated:0:1" />
-      <string key="processInstanceKey" value="2251799813685378" />
+      <string key="eventId" value="P2:S-SID-A-103759:RouteChangeAcknowledged:check-decision-SIDDHI:RISK:P2:S-SID-A-103759:ETAUpdated:0:1" />
+      <string key="processInstanceKey" value="2251799813685389" />
       <string key="productId" value="PRD-001" />
       <string key="batchId" value="DEMO-MILK-001" />
       <string key="quantityUnit" value="crate" />
-      <date key="time:timestamp" value="2026-11-14T10:04:55.924944Z" />
+      <date key="time:timestamp" value="2026-11-14T10:38:34.429068Z" />
     </event>
     <event>
       <string key="concept:name" value="DeliveryRiskDetected" />
       <string key="org:resource" value="system" />
-      <string key="eventId" value="P2:S-SID-A-100420:DeliveryRiskDetected:SIDDHI:RISK:P2:S-SID-A-100420:ETAUpdated:1:1" />
-      <string key="processInstanceKey" value="2251799813685378" />
+      <string key="eventId" value="P2:S-SID-A-103759:DeliveryRiskDetected:SIDDHI:RISK:P2:S-SID-A-103759:ETAUpdated:1:1" />
+      <string key="processInstanceKey" value="2251799813685389" />
       <string key="productId" value="PRD-001" />
       <string key="batchId" value="DEMO-MILK-001" />
       <string key="quantityUnit" value="crate" />
-      <date key="time:timestamp" value="2026-11-14T10:04:56.325399Z" />
+      <date key="time:timestamp" value="2026-11-14T10:38:40.911903Z" />
     </event>
     <event>
       <string key="concept:name" value="DispatcherDecisionRecorded" />
       <string key="org:resource" value="system" />
-      <string key="eventId" value="P2:S-SID-A-100420:DispatcherDecision:check-decision-SIDDHI:RISK:P2:S-SID-A-100420:ETAUpdated:1:1" />
-      <string key="processInstanceKey" value="2251799813685378" />
+      <string key="eventId" value="P2:S-SID-A-103759:DispatcherDecision:check-decision-SIDDHI:RISK:P2:S-SID-A-103759:ETAUpdated:1:1" />
+      <string key="processInstanceKey" value="2251799813685389" />
       <string key="productId" value="PRD-001" />
       <string key="batchId" value="DEMO-MILK-001" />
       <string key="quantityUnit" value="crate" />
-      <date key="time:timestamp" value="2026-11-14T10:05:07.946996Z" />
+      <date key="time:timestamp" value="2026-11-14T10:38:49.408729Z" />
     </event>
     <event>
       <string key="concept:name" value="ShipmentArrived" />
       <string key="org:resource" value="p2-simulator" />
-      <string key="eventId" value="P2:external:ShipmentArrived:S-SID-A-100420:SIM:journey-S-SID-A-100420:ShipmentArrived" />
-      <string key="processInstanceKey" value="2251799813685378" />
+      <string key="eventId" value="P2:external:ShipmentArrived:S-SID-A-103759:SIM:journey-S-SID-A-103759:ShipmentArrived" />
+      <string key="processInstanceKey" value="2251799813685389" />
       <string key="productId" value="PRD-001" />
       <string key="batchId" value="DEMO-MILK-001" />
       <string key="quantityUnit" value="crate" />
-      <date key="time:timestamp" value="2026-11-14T10:05:26.769193Z" />
+      <date key="time:timestamp" value="2026-11-14T10:39:11.317218Z" />
     </event>
     <event>
       <string key="concept:name" value="ReceiptAcknowledged" />
       <string key="org:resource" value="p3-manual-test" />
-      <string key="eventId" value="P2:external:ReceiptAcknowledged:S-SID-A-100420:check-receipt-S-SID-A-100420" />
-      <string key="processInstanceKey" value="2251799813685378" />
+      <string key="eventId" value="P2:external:ReceiptAcknowledged:S-SID-A-103759:check-receipt-S-SID-A-103759" />
+      <string key="processInstanceKey" value="2251799813685389" />
       <string key="productId" value="PRD-001" />
       <string key="batchId" value="DEMO-MILK-001" />
       <string key="quantityUnit" value="crate" />
-      <date key="time:timestamp" value="2026-11-14T10:05:40.710665Z" />
+      <date key="time:timestamp" value="2026-11-14T10:39:24.543894Z" />
     </event>
     <event>
       <string key="concept:name" value="VehicleReleased" />
       <string key="org:resource" value="system" />
-      <string key="eventId" value="P2:S-SID-A-100420:VehicleReleased" />
-      <string key="processInstanceKey" value="2251799813685378" />
+      <string key="eventId" value="P2:S-SID-A-103759:VehicleReleased" />
+      <string key="processInstanceKey" value="2251799813685389" />
       <string key="productId" value="PRD-001" />
       <string key="batchId" value="DEMO-MILK-001" />
       <string key="quantityUnit" value="crate" />
-      <date key="time:timestamp" value="2026-11-14T10:05:43.409810Z" />
+      <date key="time:timestamp" value="2026-11-14T10:39:26.858008Z" />
     </event>
   </trace>
   <trace>
-    <string key="concept:name" value="S-SID-B-100420" />
+    <string key="concept:name" value="S-SID-B-103759" />
     <string key="productId" value="PRD-002" />
     <string key="productName" value="Plain yoghurt" />
     <string key="batchId" value="DEMO-YOGHURT-001" />
@@ -130,62 +130,150 @@
     <event>
       <string key="concept:name" value="ShipmentDispatched" />
       <string key="org:resource" value="dispatcher-check" />
-      <string key="eventId" value="P1:S-SID-B-100420:ShipmentDispatched" />
-      <string key="processInstanceKey" value="2251799813685419" />
+      <string key="eventId" value="P1:S-SID-B-103759:ShipmentDispatched" />
+      <string key="processInstanceKey" value="2251799813685430" />
       <string key="productId" value="PRD-002" />
       <string key="batchId" value="DEMO-YOGHURT-001" />
       <string key="quantityUnit" value="crate" />
-      <date key="time:timestamp" value="2026-11-14T10:04:45.088521Z" />
+      <date key="time:timestamp" value="2026-11-14T10:38:23.504195Z" />
     </event>
     <event>
       <string key="concept:name" value="TransportStarted" />
       <string key="org:resource" value="system" />
-      <string key="eventId" value="P2:S-SID-B-100420:TransportStarted" />
-      <string key="processInstanceKey" value="2251799813685503" />
+      <string key="eventId" value="P2:S-SID-B-103759:TransportStarted" />
+      <string key="processInstanceKey" value="2251799813685516" />
       <string key="productId" value="PRD-002" />
       <string key="batchId" value="DEMO-YOGHURT-001" />
       <string key="quantityUnit" value="crate" />
-      <date key="time:timestamp" value="2026-11-14T10:04:46.246105Z" />
+      <date key="time:timestamp" value="2026-11-14T10:38:24.645746Z" />
     </event>
     <event>
       <string key="concept:name" value="JourneyStarted" />
       <string key="org:resource" value="system" />
-      <string key="eventId" value="P2:S-SID-B-100420:JourneyStarted" />
-      <string key="processInstanceKey" value="2251799813685503" />
+      <string key="eventId" value="P2:S-SID-B-103759:JourneyStarted" />
+      <string key="processInstanceKey" value="2251799813685516" />
       <string key="productId" value="PRD-002" />
       <string key="batchId" value="DEMO-YOGHURT-001" />
       <string key="quantityUnit" value="crate" />
-      <date key="time:timestamp" value="2026-11-14T10:04:46.334446Z" />
+      <date key="time:timestamp" value="2026-11-14T10:38:24.770574Z" />
     </event>
     <event>
       <string key="concept:name" value="ShipmentArrived" />
       <string key="org:resource" value="p2-simulator" />
-      <string key="eventId" value="P2:external:ShipmentArrived:S-SID-B-100420:SIM:journey-S-SID-B-100420:ShipmentArrived" />
-      <string key="processInstanceKey" value="2251799813685503" />
+      <string key="eventId" value="P2:external:ShipmentArrived:S-SID-B-103759:SIM:journey-S-SID-B-103759:ShipmentArrived" />
+      <string key="processInstanceKey" value="2251799813685516" />
       <string key="productId" value="PRD-002" />
       <string key="batchId" value="DEMO-YOGHURT-001" />
       <string key="quantityUnit" value="crate" />
-      <date key="time:timestamp" value="2026-11-14T10:05:26.640535Z" />
+      <date key="time:timestamp" value="2026-11-14T10:39:01.128146Z" />
     </event>
     <event>
       <string key="concept:name" value="ReceiptAcknowledged" />
       <string key="org:resource" value="p3-manual-test" />
-      <string key="eventId" value="P2:external:ReceiptAcknowledged:S-SID-B-100420:check-receipt-S-SID-B-100420" />
-      <string key="processInstanceKey" value="2251799813685503" />
+      <string key="eventId" value="P2:external:ReceiptAcknowledged:S-SID-B-103759:check-receipt-S-SID-B-103759" />
+      <string key="processInstanceKey" value="2251799813685516" />
       <string key="productId" value="PRD-002" />
       <string key="batchId" value="DEMO-YOGHURT-001" />
       <string key="quantityUnit" value="crate" />
-      <date key="time:timestamp" value="2026-11-14T10:05:47.020242Z" />
+      <date key="time:timestamp" value="2026-11-14T10:39:30.749747Z" />
     </event>
     <event>
       <string key="concept:name" value="VehicleReleased" />
       <string key="org:resource" value="system" />
-      <string key="eventId" value="P2:S-SID-B-100420:VehicleReleased" />
-      <string key="processInstanceKey" value="2251799813685503" />
+      <string key="eventId" value="P2:S-SID-B-103759:VehicleReleased" />
+      <string key="processInstanceKey" value="2251799813685516" />
       <string key="productId" value="PRD-002" />
       <string key="batchId" value="DEMO-YOGHURT-001" />
       <string key="quantityUnit" value="crate" />
-      <date key="time:timestamp" value="2026-11-14T10:05:49.805508Z" />
+      <date key="time:timestamp" value="2026-11-14T10:39:33.239633Z" />
+    </event>
+  </trace>
+  <trace>
+    <string key="concept:name" value="S-SID-C-103759" />
+    <string key="productId" value="PRD-003" />
+    <string key="productName" value="Fresh cheese" />
+    <string key="batchId" value="DEMO-CHEESE-001" />
+    <string key="quantityUnit" value="crate" />
+    <string key="temperatureProfileId" value="CHILLED-DEMO" />
+    <event>
+      <string key="concept:name" value="ShipmentDispatched" />
+      <string key="org:resource" value="dispatcher-check" />
+      <string key="eventId" value="P1:S-SID-C-103759:ShipmentDispatched" />
+      <string key="processInstanceKey" value="2251799813685747" />
+      <string key="productId" value="PRD-003" />
+      <string key="batchId" value="DEMO-CHEESE-001" />
+      <string key="quantityUnit" value="crate" />
+      <date key="time:timestamp" value="2026-11-14T10:39:48.116929Z" />
+    </event>
+    <event>
+      <string key="concept:name" value="TransportStarted" />
+      <string key="org:resource" value="system" />
+      <string key="eventId" value="P2:S-SID-C-103759:TransportStarted" />
+      <string key="processInstanceKey" value="2251799813685815" />
+      <string key="productId" value="PRD-003" />
+      <string key="batchId" value="DEMO-CHEESE-001" />
+      <string key="quantityUnit" value="crate" />
+      <date key="time:timestamp" value="2026-11-14T10:39:49.245029Z" />
+    </event>
+    <event>
+      <string key="concept:name" value="JourneyStarted" />
+      <string key="org:resource" value="system" />
+      <string key="eventId" value="P2:S-SID-C-103759:JourneyStarted" />
+      <string key="processInstanceKey" value="2251799813685815" />
+      <string key="productId" value="PRD-003" />
+      <string key="batchId" value="DEMO-CHEESE-001" />
+      <string key="quantityUnit" value="crate" />
+      <date key="time:timestamp" value="2026-11-14T10:39:49.332627Z" />
+    </event>
+    <event>
+      <string key="concept:name" value="DeliveryRiskDetected" />
+      <string key="org:resource" value="system" />
+      <string key="eventId" value="P2:S-SID-C-103759:DeliveryRiskDetected:SIDDHI:RISK:P2:S-SID-C-103759:ETAUpdated:0:1" />
+      <string key="processInstanceKey" value="2251799813685815" />
+      <string key="productId" value="PRD-003" />
+      <string key="batchId" value="DEMO-CHEESE-001" />
+      <string key="quantityUnit" value="crate" />
+      <date key="time:timestamp" value="2026-11-14T10:39:51.464712Z" />
+    </event>
+    <event>
+      <string key="concept:name" value="DeliveryRiskClosedAtArrival" />
+      <string key="org:resource" value="system" />
+      <string key="eventId" value="P2:S-SID-C-103759:DeliveryRiskClosedAtArrival:SIDDHI:RISK:P2:S-SID-C-103759:ETAUpdated:0:1" />
+      <string key="processInstanceKey" value="2251799813685815" />
+      <string key="productId" value="PRD-003" />
+      <string key="batchId" value="DEMO-CHEESE-001" />
+      <string key="quantityUnit" value="crate" />
+      <date key="time:timestamp" value="2026-11-14T10:40:22.407752Z" />
+    </event>
+    <event>
+      <string key="concept:name" value="ShipmentArrived" />
+      <string key="org:resource" value="p2-simulator" />
+      <string key="eventId" value="P2:external:ShipmentArrived:S-SID-C-103759:SIM:journey-S-SID-C-103759:ShipmentArrived" />
+      <string key="processInstanceKey" value="2251799813685815" />
+      <string key="productId" value="PRD-003" />
+      <string key="batchId" value="DEMO-CHEESE-001" />
+      <string key="quantityUnit" value="crate" />
+      <date key="time:timestamp" value="2026-11-14T10:40:21.614678Z" />
+    </event>
+    <event>
+      <string key="concept:name" value="ReceiptAcknowledged" />
+      <string key="org:resource" value="p3-manual-test" />
+      <string key="eventId" value="P2:external:ReceiptAcknowledged:S-SID-C-103759:check-receipt-S-SID-C-103759" />
+      <string key="processInstanceKey" value="2251799813685815" />
+      <string key="productId" value="PRD-003" />
+      <string key="batchId" value="DEMO-CHEESE-001" />
+      <string key="quantityUnit" value="crate" />
+      <date key="time:timestamp" value="2026-11-14T10:40:30.965365Z" />
+    </event>
+    <event>
+      <string key="concept:name" value="VehicleReleased" />
+      <string key="org:resource" value="system" />
+      <string key="eventId" value="P2:S-SID-C-103759:VehicleReleased" />
+      <string key="processInstanceKey" value="2251799813685815" />
+      <string key="productId" value="PRD-003" />
+      <string key="batchId" value="DEMO-CHEESE-001" />
+      <string key="quantityUnit" value="crate" />
+      <date key="time:timestamp" value="2026-11-14T10:40:34.287875Z" />
     </event>
   </trace>
 </log>
