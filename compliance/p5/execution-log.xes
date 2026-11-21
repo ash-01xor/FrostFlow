@@ -1,0 +1,375 @@
+<?xml version='1.0' encoding='utf-8'?>
+<log xes.version="1.0" xmlns="http://www.xes-standard.org/">
+  <extension name="Concept" prefix="concept" uri="http://www.xes-standard.org/concept.xesext" />
+  <extension name="Time" prefix="time" uri="http://www.xes-standard.org/time.xesext" />
+  <trace>
+    <string key="concept:name" value="CF-0da418e042e91a2411073f88" />
+    <string key="productId" value="PRD-001" />
+    <string key="productName" value="Fresh milk" />
+    <string key="batchId" value="DEMO-MILK-001" />
+    <string key="quantityUnit" value="crate" />
+    <string key="temperatureProfileId" value="CHILLED-DEMO" />
+    <event>
+      <string key="concept:name" value="ReturnDisposition" />
+      <string key="org:resource" value="quality-officer" />
+      <string key="eventId" value="P4:ASSESS:p5live-9347c2c8-1:CONTAINER:p5live-9347c2c8-1:journey-p5live-9347c2c8-1:7:DispositionRecorded:P4:ASSESS:p5live-9347c2c8-1:CONTAINER:p5live-9347c2c8-1:journey-p5live-9347c2c8-1:7:RETURN:1" />
+      <string key="processInstanceKey" value="local-c033eb8c6d3d" />
+      <string key="productId" value="PRD-001" />
+      <string key="batchId" value="DEMO-MILK-001" />
+      <string key="quantityUnit" value="crate" />
+      <date key="time:timestamp" value="2026-11-21T10:55:33.670190Z" />
+    </event>
+    <event>
+      <string key="concept:name" value="ReturnAuthorized" />
+      <string key="org:resource" value="system" />
+      <string key="eventId" value="P5:CF-0da418e042e91a2411073f88:CorrectiveWorkAuthorized" />
+      <string key="processInstanceKey" value="2251799813685680" />
+      <string key="productId" value="PRD-001" />
+      <string key="batchId" value="DEMO-MILK-001" />
+      <string key="quantityUnit" value="crate" />
+      <date key="time:timestamp" value="2026-11-21T10:55:33.895484Z" />
+    </event>
+    <event>
+      <string key="concept:name" value="CollectionBooked" />
+      <string key="org:resource" value="p5-planner" />
+      <string key="eventId" value="P5:CF-0da418e042e91a2411073f88:CollectionBooked" />
+      <string key="processInstanceKey" value="2251799813685680" />
+      <string key="productId" value="PRD-001" />
+      <string key="batchId" value="DEMO-MILK-001" />
+      <string key="quantityUnit" value="crate" />
+      <date key="time:timestamp" value="2026-11-21T10:55:34.723000Z" />
+    </event>
+    <event>
+      <string key="concept:name" value="ReturnCollected" />
+      <string key="org:resource" value="p5-receiver" />
+      <string key="eventId" value="P5:CF-0da418e042e91a2411073f88:ReturnCollected" />
+      <string key="processInstanceKey" value="2251799813685680" />
+      <string key="productId" value="PRD-001" />
+      <string key="batchId" value="DEMO-MILK-001" />
+      <string key="quantityUnit" value="crate" />
+      <date key="time:timestamp" value="2026-11-21T10:55:35.762000Z" />
+    </event>
+    <event>
+      <string key="concept:name" value="CorrectiveFulfilmentCompleted" />
+      <string key="org:resource" value="system" />
+      <string key="eventId" value="P5:CF-0da418e042e91a2411073f88:CorrectiveFulfilmentCompleted" />
+      <string key="processInstanceKey" value="2251799813685680" />
+      <string key="productId" value="PRD-001" />
+      <string key="batchId" value="DEMO-MILK-001" />
+      <string key="quantityUnit" value="crate" />
+      <date key="time:timestamp" value="2026-11-21T10:55:35.985372Z" />
+    </event>
+  </trace>
+  <trace>
+    <string key="concept:name" value="CF-459c6e8b9859e7debac6829b" />
+    <string key="productId" value="PRD-002" />
+    <string key="productName" value="Plain yoghurt" />
+    <string key="batchId" value="DEMO-YOGHURT-001" />
+    <string key="quantityUnit" value="crate" />
+    <string key="temperatureProfileId" value="CHILLED-DEMO" />
+    <event>
+      <string key="concept:name" value="ReplaceDisposition" />
+      <string key="org:resource" value="quality-officer" />
+      <string key="eventId" value="P4:ASSESS:p5live-9347c2c8-2:CONTAINER:p5live-9347c2c8-2:journey-p5live-9347c2c8-2:7:DispositionRecorded:P4:ASSESS:p5live-9347c2c8-2:CONTAINER:p5live-9347c2c8-2:journey-p5live-9347c2c8-2:7:REPLACE:1" />
+      <string key="processInstanceKey" value="local-858c12e84e94" />
+      <string key="productId" value="PRD-002" />
+      <string key="batchId" value="DEMO-YOGHURT-001" />
+      <string key="quantityUnit" value="crate" />
+      <date key="time:timestamp" value="2026-11-21T10:56:17.537086Z" />
+    </event>
+    <event>
+      <string key="concept:name" value="ReplacementAuthorized" />
+      <string key="org:resource" value="system" />
+      <string key="eventId" value="P5:CF-459c6e8b9859e7debac6829b:CorrectiveWorkAuthorized" />
+      <string key="processInstanceKey" value="2251799813686123" />
+      <string key="productId" value="PRD-002" />
+      <string key="batchId" value="DEMO-YOGHURT-001" />
+      <string key="quantityUnit" value="crate" />
+      <date key="time:timestamp" value="2026-11-21T10:56:18.097403Z" />
+    </event>
+    <event>
+      <string key="concept:name" value="CollectionBooked" />
+      <string key="org:resource" value="p5-planner" />
+      <string key="eventId" value="P5:CF-459c6e8b9859e7debac6829b:CollectionBooked" />
+      <string key="processInstanceKey" value="2251799813686123" />
+      <string key="productId" value="PRD-002" />
+      <string key="batchId" value="DEMO-YOGHURT-001" />
+      <string key="quantityUnit" value="crate" />
+      <date key="time:timestamp" value="2026-11-21T10:56:18.598000Z" />
+    </event>
+    <event>
+      <string key="concept:name" value="ReplacementRequested" />
+      <string key="org:resource" value="p5-planner" />
+      <string key="eventId" value="P5:CF-459c6e8b9859e7debac6829b:ReplacementRequested" />
+      <string key="processInstanceKey" value="2251799813686123" />
+      <string key="productId" value="PRD-002" />
+      <string key="batchId" value="DEMO-YOGHURT-001" />
+      <string key="quantityUnit" value="crate" />
+      <date key="time:timestamp" value="2026-11-21T10:56:19.123747Z" />
+    </event>
+    <event>
+      <string key="concept:name" value="ReplacementDispatched" />
+      <string key="org:resource" value="system" />
+      <string key="eventId" value="P5:CF-459c6e8b9859e7debac6829b:ReplacementDispatched" />
+      <string key="processInstanceKey" value="2251799813686123" />
+      <string key="productId" value="PRD-002" />
+      <string key="batchId" value="DEMO-YOGHURT-001" />
+      <string key="quantityUnit" value="crate" />
+      <date key="time:timestamp" value="2026-11-21T10:56:21.224650Z" />
+    </event>
+    <event>
+      <string key="concept:name" value="ReplacementAdmitted" />
+      <string key="org:resource" value="system" />
+      <string key="eventId" value="P5:CF-459c6e8b9859e7debac6829b:ReplacementAdmitted" />
+      <string key="processInstanceKey" value="2251799813686123" />
+      <string key="productId" value="PRD-002" />
+      <string key="batchId" value="DEMO-YOGHURT-001" />
+      <string key="quantityUnit" value="crate" />
+      <date key="time:timestamp" value="2026-11-21T10:56:40.936119Z" />
+    </event>
+    <event>
+      <string key="concept:name" value="ReturnCollected" />
+      <string key="org:resource" value="p5-receiver" />
+      <string key="eventId" value="P5:CF-459c6e8b9859e7debac6829b:ReturnCollected" />
+      <string key="processInstanceKey" value="2251799813686123" />
+      <string key="productId" value="PRD-002" />
+      <string key="batchId" value="DEMO-YOGHURT-001" />
+      <string key="quantityUnit" value="crate" />
+      <date key="time:timestamp" value="2026-11-21T10:56:45.071000Z" />
+    </event>
+    <event>
+      <string key="concept:name" value="CorrectiveFulfilmentCompleted" />
+      <string key="org:resource" value="system" />
+      <string key="eventId" value="P5:CF-459c6e8b9859e7debac6829b:CorrectiveFulfilmentCompleted" />
+      <string key="processInstanceKey" value="2251799813686123" />
+      <string key="productId" value="PRD-002" />
+      <string key="batchId" value="DEMO-YOGHURT-001" />
+      <string key="quantityUnit" value="crate" />
+      <date key="time:timestamp" value="2026-11-21T10:56:46.147002Z" />
+    </event>
+  </trace>
+  <trace>
+    <string key="concept:name" value="CF-042e48f9746bd9725d15480e" />
+    <string key="productId" value="PRD-003" />
+    <string key="productName" value="Fresh cheese" />
+    <string key="batchId" value="DEMO-CHEESE-001" />
+    <string key="quantityUnit" value="crate" />
+    <string key="temperatureProfileId" value="CHILLED-DEMO" />
+    <event>
+      <string key="concept:name" value="ReplaceDisposition" />
+      <string key="org:resource" value="quality-officer" />
+      <string key="eventId" value="P4:ASSESS:p5live-9347c2c8-3:CONTAINER:p5live-9347c2c8-3:journey-p5live-9347c2c8-3:7:DispositionRecorded:P4:ASSESS:p5live-9347c2c8-3:CONTAINER:p5live-9347c2c8-3:journey-p5live-9347c2c8-3:7:REPLACE:1" />
+      <string key="processInstanceKey" value="local-8aa13b28ed3d" />
+      <string key="productId" value="PRD-003" />
+      <string key="batchId" value="DEMO-CHEESE-001" />
+      <string key="quantityUnit" value="crate" />
+      <date key="time:timestamp" value="2026-11-21T10:57:25.824647Z" />
+    </event>
+    <event>
+      <string key="concept:name" value="ReplacementAuthorized" />
+      <string key="org:resource" value="system" />
+      <string key="eventId" value="P5:CF-042e48f9746bd9725d15480e:CorrectiveWorkAuthorized" />
+      <string key="processInstanceKey" value="2251799813686868" />
+      <string key="productId" value="PRD-003" />
+      <string key="batchId" value="DEMO-CHEESE-001" />
+      <string key="quantityUnit" value="crate" />
+      <date key="time:timestamp" value="2026-11-21T10:57:26.497984Z" />
+    </event>
+    <event>
+      <string key="concept:name" value="CollectionBooked" />
+      <string key="org:resource" value="p5-planner" />
+      <string key="eventId" value="P5:CF-042e48f9746bd9725d15480e:CollectionBooked" />
+      <string key="processInstanceKey" value="2251799813686868" />
+      <string key="productId" value="PRD-003" />
+      <string key="batchId" value="DEMO-CHEESE-001" />
+      <string key="quantityUnit" value="crate" />
+      <date key="time:timestamp" value="2026-11-21T10:57:26.865000Z" />
+    </event>
+    <event>
+      <string key="concept:name" value="ReplacementRequested" />
+      <string key="org:resource" value="p5-planner" />
+      <string key="eventId" value="P5:CF-042e48f9746bd9725d15480e:ReplacementRequested" />
+      <string key="processInstanceKey" value="2251799813686868" />
+      <string key="productId" value="PRD-003" />
+      <string key="batchId" value="DEMO-CHEESE-001" />
+      <string key="quantityUnit" value="crate" />
+      <date key="time:timestamp" value="2026-11-21T10:57:27.526871Z" />
+    </event>
+    <event>
+      <string key="concept:name" value="ReplacementDispatched" />
+      <string key="org:resource" value="system" />
+      <string key="eventId" value="P5:CF-042e48f9746bd9725d15480e:ReplacementDispatched" />
+      <string key="processInstanceKey" value="2251799813686868" />
+      <string key="productId" value="PRD-003" />
+      <string key="batchId" value="DEMO-CHEESE-001" />
+      <string key="quantityUnit" value="crate" />
+      <date key="time:timestamp" value="2026-11-21T10:57:29.599868Z" />
+    </event>
+    <event>
+      <string key="concept:name" value="ReplacementRejected" />
+      <string key="org:resource" value="system" />
+      <string key="eventId" value="P5:CF-042e48f9746bd9725d15480e:ReplacementRejected" />
+      <string key="processInstanceKey" value="2251799813686868" />
+      <string key="productId" value="PRD-003" />
+      <string key="batchId" value="DEMO-CHEESE-001" />
+      <string key="quantityUnit" value="crate" />
+      <date key="time:timestamp" value="2026-11-21T10:57:59.665726Z" />
+    </event>
+    <event>
+      <string key="concept:name" value="ReturnCollected" />
+      <string key="org:resource" value="p5-receiver" />
+      <string key="eventId" value="P5:CF-042e48f9746bd9725d15480e:ReturnCollected" />
+      <string key="processInstanceKey" value="2251799813686868" />
+      <string key="productId" value="PRD-003" />
+      <string key="batchId" value="DEMO-CHEESE-001" />
+      <string key="quantityUnit" value="crate" />
+      <date key="time:timestamp" value="2026-11-21T10:58:07.605000Z" />
+    </event>
+    <event>
+      <string key="concept:name" value="CorrectiveFulfilmentFailed" />
+      <string key="org:resource" value="system" />
+      <string key="eventId" value="P5:CF-042e48f9746bd9725d15480e:CorrectiveFulfilmentFailed" />
+      <string key="processInstanceKey" value="2251799813686868" />
+      <string key="productId" value="PRD-003" />
+      <string key="batchId" value="DEMO-CHEESE-001" />
+      <string key="quantityUnit" value="crate" />
+      <date key="time:timestamp" value="2026-11-21T10:58:07.992996Z" />
+    </event>
+  </trace>
+  <trace>
+    <string key="concept:name" value="CF-28328763c79177f408ca06ca" />
+    <string key="productId" value="PRD-003" />
+    <string key="productName" value="Fresh cheese" />
+    <string key="batchId" value="DEMO-CHEESE-001" />
+    <string key="quantityUnit" value="crate" />
+    <string key="temperatureProfileId" value="CHILLED-DEMO" />
+    <event>
+      <string key="concept:name" value="ReturnDisposition" />
+      <string key="org:resource" value="quality-officer" />
+      <string key="eventId" value="P4:ASSESS:p5live-9347c2c8-3-replacement:CONTAINER:p5live-9347c2c8-3-replacement:journey-p5live-9347c2c8-3-replacement:6:DispositionRecorded:P4:ASSESS:p5live-9347c2c8-3-replacement:CONTAINER:p5live-9347c2c8-3-replacement:journey-p5live-9347c2c8-3-replacement:6:RETURN:1" />
+      <string key="processInstanceKey" value="local-056315701352" />
+      <string key="productId" value="PRD-003" />
+      <string key="batchId" value="DEMO-CHEESE-001" />
+      <string key="quantityUnit" value="crate" />
+      <date key="time:timestamp" value="2026-11-21T10:57:58.328012Z" />
+    </event>
+    <event>
+      <string key="concept:name" value="ReturnAuthorized" />
+      <string key="org:resource" value="system" />
+      <string key="eventId" value="P5:CF-28328763c79177f408ca06ca:CorrectiveWorkAuthorized" />
+      <string key="processInstanceKey" value="2251799813687267" />
+      <string key="productId" value="PRD-003" />
+      <string key="batchId" value="DEMO-CHEESE-001" />
+      <string key="quantityUnit" value="crate" />
+      <date key="time:timestamp" value="2026-11-21T10:57:58.633526Z" />
+    </event>
+    <event>
+      <string key="concept:name" value="CollectionBooked" />
+      <string key="org:resource" value="p5-planner" />
+      <string key="eventId" value="P5:CF-28328763c79177f408ca06ca:CollectionBooked" />
+      <string key="processInstanceKey" value="2251799813687267" />
+      <string key="productId" value="PRD-003" />
+      <string key="batchId" value="DEMO-CHEESE-001" />
+      <string key="quantityUnit" value="crate" />
+      <date key="time:timestamp" value="2026-11-21T10:58:03.502000Z" />
+    </event>
+    <event>
+      <string key="concept:name" value="ReturnCollected" />
+      <string key="org:resource" value="p5-receiver" />
+      <string key="eventId" value="P5:CF-28328763c79177f408ca06ca:ReturnCollected" />
+      <string key="processInstanceKey" value="2251799813687267" />
+      <string key="productId" value="PRD-003" />
+      <string key="batchId" value="DEMO-CHEESE-001" />
+      <string key="quantityUnit" value="crate" />
+      <date key="time:timestamp" value="2026-11-21T10:58:04.527000Z" />
+    </event>
+    <event>
+      <string key="concept:name" value="CorrectiveFulfilmentCompleted" />
+      <string key="org:resource" value="system" />
+      <string key="eventId" value="P5:CF-28328763c79177f408ca06ca:CorrectiveFulfilmentCompleted" />
+      <string key="processInstanceKey" value="2251799813687267" />
+      <string key="productId" value="PRD-003" />
+      <string key="batchId" value="DEMO-CHEESE-001" />
+      <string key="quantityUnit" value="crate" />
+      <date key="time:timestamp" value="2026-11-21T10:58:04.865571Z" />
+    </event>
+  </trace>
+  <trace>
+    <string key="concept:name" value="CF-009accd9d9ac967f9ade16d1" />
+    <string key="productId" value="PRD-004" />
+    <string key="productName" value="Raw chicken breast" />
+    <string key="batchId" value="DEMO-CHICKEN-001" />
+    <string key="quantityUnit" value="crate" />
+    <string key="temperatureProfileId" value="CHILLED-DEMO" />
+    <event>
+      <string key="concept:name" value="ReplaceDisposition" />
+      <string key="org:resource" value="quality-officer" />
+      <string key="eventId" value="P4:ASSESS:p5live-9347c2c8-4:CONTAINER:p5live-9347c2c8-4:journey-p5live-9347c2c8-4:7:DispositionRecorded:P4:ASSESS:p5live-9347c2c8-4:CONTAINER:p5live-9347c2c8-4:journey-p5live-9347c2c8-4:7:REPLACE:1" />
+      <string key="processInstanceKey" value="local-6fcc87a162c1" />
+      <string key="productId" value="PRD-004" />
+      <string key="batchId" value="DEMO-CHICKEN-001" />
+      <string key="quantityUnit" value="crate" />
+      <date key="time:timestamp" value="2026-11-21T10:58:50.305134Z" />
+    </event>
+    <event>
+      <string key="concept:name" value="ReplacementAuthorized" />
+      <string key="org:resource" value="system" />
+      <string key="eventId" value="P5:CF-009accd9d9ac967f9ade16d1:CorrectiveWorkAuthorized" />
+      <string key="processInstanceKey" value="2251799813687748" />
+      <string key="productId" value="PRD-004" />
+      <string key="batchId" value="DEMO-CHICKEN-001" />
+      <string key="quantityUnit" value="crate" />
+      <date key="time:timestamp" value="2026-11-21T10:58:50.583743Z" />
+    </event>
+    <event>
+      <string key="concept:name" value="CollectionBooked" />
+      <string key="org:resource" value="p5-planner" />
+      <string key="eventId" value="P5:CF-009accd9d9ac967f9ade16d1:CollectionBooked" />
+      <string key="processInstanceKey" value="2251799813687748" />
+      <string key="productId" value="PRD-004" />
+      <string key="batchId" value="DEMO-CHICKEN-001" />
+      <string key="quantityUnit" value="crate" />
+      <date key="time:timestamp" value="2026-11-21T10:58:51.350000Z" />
+    </event>
+    <event>
+      <string key="concept:name" value="ReplacementRequested" />
+      <string key="org:resource" value="p5-planner" />
+      <string key="eventId" value="P5:CF-009accd9d9ac967f9ade16d1:ReplacementRequested" />
+      <string key="processInstanceKey" value="2251799813687748" />
+      <string key="productId" value="PRD-004" />
+      <string key="batchId" value="DEMO-CHICKEN-001" />
+      <string key="quantityUnit" value="crate" />
+      <date key="time:timestamp" value="2026-11-21T10:58:51.616960Z" />
+    </event>
+    <event>
+      <string key="concept:name" value="ReplacementCancelled" />
+      <string key="org:resource" value="system" />
+      <string key="eventId" value="P5:CF-009accd9d9ac967f9ade16d1:ReplacementCancelled" />
+      <string key="processInstanceKey" value="2251799813687748" />
+      <string key="productId" value="PRD-004" />
+      <string key="batchId" value="DEMO-CHICKEN-001" />
+      <string key="quantityUnit" value="crate" />
+      <date key="time:timestamp" value="2026-11-21T10:58:52.676445Z" />
+    </event>
+    <event>
+      <string key="concept:name" value="ReturnCollected" />
+      <string key="org:resource" value="p5-receiver" />
+      <string key="eventId" value="P5:CF-009accd9d9ac967f9ade16d1:ReturnCollected" />
+      <string key="processInstanceKey" value="2251799813687748" />
+      <string key="productId" value="PRD-004" />
+      <string key="batchId" value="DEMO-CHICKEN-001" />
+      <string key="quantityUnit" value="crate" />
+      <date key="time:timestamp" value="2026-11-21T10:58:56.505000Z" />
+    </event>
+    <event>
+      <string key="concept:name" value="CorrectiveFulfilmentFailed" />
+      <string key="org:resource" value="system" />
+      <string key="eventId" value="P5:CF-009accd9d9ac967f9ade16d1:CorrectiveFulfilmentFailed" />
+      <string key="processInstanceKey" value="2251799813687748" />
+      <string key="productId" value="PRD-004" />
+      <string key="batchId" value="DEMO-CHICKEN-001" />
+      <string key="quantityUnit" value="crate" />
+      <date key="time:timestamp" value="2026-11-21T10:58:56.821619Z" />
+    </event>
+  </trace>
+</log>

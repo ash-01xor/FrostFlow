@@ -1,0 +1,107 @@
+{
+  "p1": {
+    "p1-b9814f2e-1": {
+      "valid": true,
+      "accepting": true,
+      "pending": []
+    },
+    "p1-b9814f2e-2": {
+      "valid": true,
+      "accepting": true,
+      "pending": []
+    },
+    "p1-b9814f2e-3": {
+      "valid": true,
+      "accepting": true,
+      "pending": []
+    }
+  },
+  "p2": {
+    "S-SID-A-151259": {
+      "valid": true,
+      "accepting": true,
+      "pending": []
+    },
+    "S-SID-B-151259": {
+      "valid": true,
+      "accepting": true,
+      "pending": []
+    },
+    "S-SID-C-151259": {
+      "valid": true,
+      "accepting": true,
+      "pending": []
+    }
+  },
+  "p3": {
+    "normal-receipt-admission|p3comp-53e0ffb2-normal-receipt-admission": {
+      "valid": true,
+      "accepting": true,
+      "pending": []
+    },
+    "quality-hold-release|p3comp-53e0ffb2-quality-hold-release": {
+      "valid": true,
+      "accepting": true,
+      "pending": []
+    },
+    "inspection-rejection|p3comp-53e0ffb2-inspection-rejection": {
+      "valid": true,
+      "accepting": true,
+      "pending": []
+    },
+    "quality-rejection|p3comp-53e0ffb2-quality-rejection": {
+      "valid": true,
+      "accepting": true,
+      "pending": []
+    }
+  },
+  "p4": {
+    "p4live-ed88d16d-1/DELAY:risk-p4live-ed88d16d-1": {
+      "valid": true,
+      "accepting": true,
+      "pending": []
+    },
+    "p4live-ed88d16d-2/ASSESS:p4live-ed88d16d-2:CONTAINER:p4live-ed88d16d-2:journey-p4live-ed88d16d-2:7": {
+      "valid": true,
+      "accepting": true,
+      "pending": []
+    },
+    "p4live-ed88d16d-3/DELAY:risk-p4live-ed88d16d-3": {
+      "valid": true,
+      "accepting": true,
+      "pending": []
+    },
+    "p4live-ed88d16d-4/DELAY:risk-p4live-ed88d16d-4": {
+      "valid": true,
+      "accepting": true,
+      "pending": []
+    }
+  },
+  "p5": {
+    "CF-0da418e042e91a2411073f88": {
+      "valid": true,
+      "accepting": true,
+      "pending": []
+    },
+    "CF-459c6e8b9859e7debac6829b": {
+      "valid": true,
+      "accepting": true,
+      "pending": []
+    },
+    "CF-042e48f9746bd9725d15480e": {
+      "valid": true,
+      "accepting": true,
+      "pending": []
+    },
+    "CF-28328763c79177f408ca06ca": {
+      "valid": true,
+      "accepting": true,
+      "pending": []
+    },
+    "CF-009accd9d9ac967f9ade16d1": {
+      "valid": true,
+      "accepting": true,
+      "pending": []
+    }
+  }
+}

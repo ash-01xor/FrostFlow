@@ -6,7 +6,7 @@ The original implementation (PR #10) was reverted by PR #11 so that the monitori
 
 ## What P4 does
 
-When the foundation places a quality hold (a delivery risk, a container temperature excursion, combined transport risk or missing/unavailable monitoring evidence), it sends one durable message to P4. P4 opens an investigation case in DCR. The quality officer collects evidence in whatever order the case needs while DCR enforces the rules that must always hold. The officer's decision is the only thing that lifts or confirms the hold: **release** lets P3 admit the goods (after monitoring finalization and a passed inspection); **replace** or **return** rejects them (P5 corrective fulfilment is still planned).
+When the foundation places a quality hold (a delivery risk, a container temperature excursion, combined transport risk or missing/unavailable monitoring evidence), it sends one durable message to P4. P4 opens an investigation case in DCR. The quality officer collects evidence in whatever order the case needs while DCR enforces the rules that must always hold. The officer's decision is the only thing that lifts or confirms the hold: **release** lets P3 admit the goods (after monitoring finalization and a passed inspection); **replace** or **return** rejects them (P5 corrective fulfilment consumes the applied decision; see the [P5 guide](P5-CORRECTIVE-FULFILMENT.md)).
 
 The AS-IS process (assumed coursework scenario, not interview data) is in [`dcr/p4_as_is.pdf`](../dcr/p4_as_is.pdf).
 
@@ -17,6 +17,7 @@ sequenceDiagram
     participant R as Registry (SQLite)
     participant P4 as P4 investigation (DCR)
     participant P3 as P3 receiving (Zeebe)
+    participant P5 as P5 corrective fulfilment (Zeebe)
     M->>R: container evaluation -> assessment_hold (PENDING, evidenceVersion n)
     P2->>R: delivery risk -> assessment_hold
     R-->>P4: outbox POST P4_INCIDENT_URL {"event": ...}, Idempotency-Key = deliveryId
@@ -26,6 +27,8 @@ sequenceDiagram
     Note over P4: officer reviews; AssessEvidence records assessed version n
     P4->>R: accept_quality_status(RELEASED/REJECTED, incident, expectedEvidenceVersion = n)
     R-->>P3: QualityStatusChanged -> admit or reject
+    P4->>R: journal applied disposition + save decision
+    R-->>P5: atomic P5 case/outbox for REPLACE or RETURN
 ```
 
 ## Rules (R1–R9) and the graph
@@ -59,6 +62,7 @@ All **3 425** reachable markings can reach an accepting marking and every activi
 | Stale or refused decision | If the registry refuses in step 1 (newer evidence, wrong incident, terminal rejection) or DCR no longer enables the decision, nothing is executed in DCR. If newer evidence reaches the registry between steps 1 and 3, the registry refuses in step 3; that DCR case already holds the decision and cannot take another, so the investigation continues in a new DCR case for the same incident (`previousDcrCases`), which needs a fresh assessment. Either way the attempt is journalled as `StaleDispositionRefused`, kept in `unappliedDecisions` (`executedInDcr` tells which case), and the officer must assess again (HTTP 409 with `reassessmentRequired`). The investigation cannot close as if a release happened. |
 | Transient failure | A failed registry call or DCR call leaves one durable `pendingDecision` with a fixed `eventId`/`occurredAt`; the delivery loop retries it with the same identity (HTTP 503 to the officer meanwhile). The DCR attempt is recorded before the call. If DCR executed the decision but the response was lost (or the service stopped before journalling), the retry finds the decision no longer enabled and records it as executed (`reconciledAfterLostResponse`), then applies it in the registry. This relies on P4 being the only writer of its DCR cases: all DCR calls run under one lock, and an attempted decision is settled before any other change. A definite DCR refusal (HTTP 400/409/422, or the local engine refusing) is not taken as executed. The officer's other activities (`pendingActivity`, e.g. `CloseInvestigation`) and the system events (`OpenIncident`, `AddAlertEvidence`) are recorded before the DCR call too. A retry executes them again when DCR still enables them (executing a DCR event twice gives the same marking as once; `P4Graph` checks this for every reachable marking) and otherwise records them as already executed. Each is journalled once. |
 | Officer request identity | With an `eventId`, the first request's activity, actor, reason and note are stored. An identical retry returns the original result (or finishes a decision still being applied); reuse with any different detail is 409. |
+| Corrective handoff | After quality-status application, the disposition journal, saved P4 decision, one P5 case and `P5DispositionRecorded` outbox are committed together. A failed transaction leaves the pending decision recoverable; retry creates no duplicate corrective work. `RELEASE` and the quality-status test stand-in create none. P4 closure does not wait for P5. |
 | Terminal rejection | Later evidence for a rejected incident (`qualityStatus: REJECTED`, `incidentOpened: false`) is recorded (`LateAlertEvidenceRecorded`) and never reopens admission. |
 | Receiving | Physical receipt releases the vehicle while the hold stays; P3 waits for monitoring finalization; a P4 release never bypasses finalization or inspection. |
 
@@ -138,5 +142,5 @@ Every case checks that receipt released the vehicle while quality was still held
 
 ## Still to do
 
-- Optional: run the full stack with P4 in `dcr-repository` mode.
-- Cooling-command/recovery contracts (Siddhi) and P5/P6 consumption of `REPLACE`/`RETURN` remain separate future work.
+- Cooling-command/recovery contracts (Siddhi), the external physical simulator and P6 claims remain future work.
+- P5 now consumes applied `REPLACE`/`RETURN` decisions; its live/local/external results are in the [P5 guide](P5-CORRECTIVE-FULFILMENT.md). This branch’s P5 acceptance uses local DCR. Earlier full-stack repository-mode runs retain their recorded revisions above.

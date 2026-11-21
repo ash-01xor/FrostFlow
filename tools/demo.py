@@ -1,4 +1,4 @@
-"""Interactive demonstration controls for the P1/P2/P3 shipment workflow.
+"""Interactive demonstration controls for P1–P5.
 
 Uses the application's HTTP API; no Docker commands or data resets are performed.
 Run from the repository root: python tools/demo.py
@@ -288,12 +288,16 @@ def investigate_quality(base, shipment_id):
     show(http(base, f"/shipments/{shipment_id}")[1])
 
 
-def choose_case():
+def choose_case(base=None):
     print("A = 15 crates / V-01 | B = 10 crates / V-02 | C = 10 crates / V-02")
-    label = input("Shipment [A/B/C]: ").strip().upper()
-    if label not in CASES:
-        raise ValueError("Choose A, B or C.")
-    return CASES[label]
+    label = input("Shipment [A/B/C or existing shipment ID]: ").strip()
+    if label.upper() in CASES:
+        return CASES[label.upper()]
+    if base:
+        status, record = http(base, "/shipments/" + quote(label, safe=""))
+        if status == 200:
+            return record["shipmentId"], record["vehicleId"], record["quantity"]
+    raise ValueError("Choose A, B, C or an existing shipment ID.")
 
 
 def inventory(base):
@@ -336,7 +340,7 @@ def perform(base, choice, deadline_minutes=60):
     if choice == "16":
         receiving_inventory(base)
         return
-    shipment_id, vehicle, quantity = choose_case()
+    shipment_id, vehicle, quantity = choose_case(base)
     path = f"/shipments/{shipment_id}"
     if choice == "18":
         scenario = input("Scenario (normal/isolated-spike/sustained-excursion/missing-telemetry): ").strip()
@@ -349,6 +353,9 @@ def perform(base, choice, deadline_minutes=60):
         return
     if choice == "19":
         investigate_quality(base, shipment_id)
+        return
+    if choice == "20":
+        corrective_fulfilment(base, shipment_id, deadline_minutes)
         return
     if choice in ("2", "7"):
         status, record = http(base, path if choice == "2" else path + "/events")
@@ -518,6 +525,55 @@ def perform(base, choice, deadline_minutes=60):
     )
 
 
+def corrective_fulfilment(base, shipment_id, deadline_minutes=60):
+    status, cases = http(base, "/corrective-fulfilments?originalShipmentId=" + quote(shipment_id, safe=""))
+    if status != 200 or not cases:
+        print("No corrective case. P4 must apply a replacement or return decision first.")
+        return
+    case = cases[-1]
+    path = "/corrective-fulfilments/" + case["correctiveId"]
+    print(json.dumps(case, indent=2))
+    action = input("P5 action (view/arrange/collect): ").strip().lower()
+    if action == "view":
+        return
+    moment = datetime.now(timezone.utc)
+    data = {"eventId": "p5-" + str(time.time_ns()),
+            "occurredAt": moment.isoformat().replace("+00:00", "Z"), "actor": "demo-operator"}
+    if action == "arrange":
+        data.update(collector=input("Collector: ").strip(),
+                    bookingReference=input("Collection booking reference: ").strip(),
+                    scheduledAt=input("Scheduled collection (UTC ISO 8601): ").strip())
+        if case["action"] == "REPLACE":
+            replacement_id = input("New replacement shipment ID: ").strip()
+            data["replacement"] = dict(
+                shipmentId=replacement_id, journeyId="J-" + replacement_id,
+                vehicleId=input("Free vehicle (V-01/V-02): ").strip(),
+                routeId=input("Route (route-01/route-02): ").strip(),
+                deliveryDeadline=(moment + timedelta(minutes=deadline_minutes)).isoformat().replace("+00:00", "Z"))
+        expected = lambda c: c["status"] in ("IN_PROGRESS", "COMPLETED", "FAILED")
+    elif action == "collect":
+        booking = (case.get("arrangement") or {}).get("payload", {})
+        data.update(collector=booking.get("collector", ""), bookingReference=booking.get("bookingReference", ""),
+                    quantityCollected=int(input("Original crates physically collected: ")))
+        expected = lambda c: c["originalGoodsStatus"] == "COLLECTED"
+    else:
+        raise ValueError("choose view, arrange or collect")
+    status, result = http(base, path + "/" + action, data)
+    print(status, json.dumps(result, indent=2))
+    if status == 202:
+        until = time.monotonic() + 30
+        while time.monotonic() < until:
+            code, current = http(base, path)
+            if code == 200 and expected(current):
+                print(json.dumps(current, indent=2))
+                if current.get("replacementShipmentId"):
+                    print("Use actions 3/4 and 14/15 on replacement", current["replacementShipmentId"],
+                          "to verify loading, dispatch, receive and inspect through P1–P3.")
+                return
+            time.sleep(0.5)
+        print("P5 input remains accepted. Inspect the case and Operate before retrying.")
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--base-url", default="http://localhost:5001")
@@ -565,11 +621,12 @@ def main():
             print("17 Release quality hold (test stand-in, bypasses P4)")
             print("18 Change simulated temperature scenario")
             print("19 Quality investigation (P4, executed in DCR)")
+            print("20 Corrective fulfilment (P5, booking and collection)")
             choice = input("Action: ").strip()
             if choice == "0":
                 return 0
-            if choice not in {str(value) for value in range(1, 20)}:
-                print("Choose an action from 0 to 19.")
+            if choice not in {str(value) for value in range(1, 21)}:
+                print("Choose an action from 0 to 20.")
                 continue
             try:
                 perform(base, choice, args.deadline_minutes)

@@ -1,0 +1,201 @@
+{
+  "checkedAt": "2026-11-21T10:59:29.273421+00:00",
+  "testedCommit": "d1188701bae54a0d738a1497ba5e59605322e7b8",
+  "sourceChecks": {
+    "deployer/app.py": {
+      "expected": "4fc5f16f0215bda123b0fe309fe623d9181fa0262ad8fd25bdd3687d5ce28811",
+      "running": "4fc5f16f0215bda123b0fe309fe623d9181fa0262ad8fd25bdd3687d5ce28811"
+    },
+    "deployer/corrective.py": {
+      "expected": "dfa9a74ba670340e72da8a4cc5ae88c5eabe920aceaeeca9c22f8684a6e21cd7",
+      "running": "dfa9a74ba670340e72da8a4cc5ae88c5eabe920aceaeeca9c22f8684a6e21cd7"
+    },
+    "deployer/corrective_registry.py": {
+      "expected": "da8481c2f626b9c07352585aa62dd60445b08bb0259d7d3ce272718636311797",
+      "running": "da8481c2f626b9c07352585aa62dd60445b08bb0259d7d3ce272718636311797"
+    },
+    "deployer/dcr_client.py": {
+      "expected": "4039649743794aa7ef441bf4a3887d584c9e1b0308054909cef9a6fb97757e75",
+      "running": "4039649743794aa7ef441bf4a3887d584c9e1b0308054909cef9a6fb97757e75"
+    },
+    "deployer/monitoring.py": {
+      "expected": "c8e9f8cc8ae53738700ecf8050863aab4d7ca5de37161a90273503e315edf2a5",
+      "running": "c8e9f8cc8ae53738700ecf8050863aab4d7ca5de37161a90273503e315edf2a5"
+    },
+    "deployer/monitoring_registry.py": {
+      "expected": "22378e200627701fc90e3882d4222883551b4f77064325992ba7fe7f31b8efa9",
+      "running": "22378e200627701fc90e3882d4222883551b4f77064325992ba7fe7f31b8efa9"
+    },
+    "deployer/quality.py": {
+      "expected": "321f561df8b8798895cc0221619b8ae8a41cf02ab972929a5c1ccb6c31a2d73e",
+      "running": "321f561df8b8798895cc0221619b8ae8a41cf02ab972929a5c1ccb6c31a2d73e"
+    },
+    "deployer/registry.py": {
+      "expected": "cb1c48cabdeeec78c33b5a3526229864154516b989dca871b4c1c7e7482e5779",
+      "running": "cb1c48cabdeeec78c33b5a3526229864154516b989dca871b4c1c7e7482e5779"
+    },
+    "deployer/transport_integrations.py": {
+      "expected": "8c60e20a3f97bf5610ed18ccb548d0c514ba278c794f6321ae91926f78abeee8",
+      "running": "8c60e20a3f97bf5610ed18ccb548d0c514ba278c794f6321ae91926f78abeee8"
+    },
+    "deployer/weather.py": {
+      "expected": "b4687b1b70f5937c62523fa7df91852a2831b546a8fa32d77f4d3e98f1fd61a5",
+      "running": "b4687b1b70f5937c62523fa7df91852a2831b546a8fa32d77f4d3e98f1fd61a5"
+    },
+    "bpmn/corrective_fulfilment.bpmn": {
+      "expected": "4fcb75985ade77710c83983008d35f63cd26ce12bc539d277f8ead430bc10792",
+      "running": "4fcb75985ade77710c83983008d35f63cd26ce12bc539d277f8ead430bc10792"
+    },
+    "bpmn/shipment_preparation.bpmn": {
+      "expected": "ff7cca3684bb5c41e425dd3666abdc05c146fb0ac12f540c80019b16d4fe3efa",
+      "running": "ff7cca3684bb5c41e425dd3666abdc05c146fb0ac12f540c80019b16d4fe3efa"
+    },
+    "bpmn/receiving.bpmn": {
+      "expected": "2aa42bd54e2c16e13d66b437d5a60cbb128ab0284eb9ade0d62b78faadb9829b",
+      "running": "2aa42bd54e2c16e13d66b437d5a60cbb128ab0284eb9ade0d62b78faadb9829b"
+    },
+    "bpmn/transport.bpmn": {
+      "expected": "1bca58249dbd06f3b2cbd8985f334e1c022941d743e47b221c88b7dcc2ce13c6",
+      "running": "1bca58249dbd06f3b2cbd8985f334e1c022941d743e47b221c88b7dcc2ce13c6"
+    },
+    "deployer/catalog.json": {
+      "expected": "805f082c60f4c54551c506bc5e5ee5864ddc0001de0a822169dd970571714860",
+      "running": "805f082c60f4c54551c506bc5e5ee5864ddc0001de0a822169dd970571714860"
+    },
+    "dcr/p4_quality_investigation.xml": {
+      "expected": "630bcdc2a0c6140eee6f9ac78e5aaf2366bea31c471915546498078c6261c610",
+      "running": "630bcdc2a0c6140eee6f9ac78e5aaf2366bea31c471915546498078c6261c610"
+    }
+  },
+  "allRunningSourcesMatch": true,
+  "composeProject": "frostflow-p5",
+  "dataset": "p5-02",
+  "registry": "runtime/p5/p5-02/registry.sqlite",
+  "gpsTickSeconds": 2,
+  "tomtomMode": "local-demo-estimate",
+  "dcrMode": "local-dcr-engine",
+  "containers": [
+    {
+      "name": "frostflow-p5-communication-1",
+      "imageId": "sha256:08dbeb6ef1e8bbd5f6c135be891eba942fa1b0b13818e54efbd749fbace2df8f",
+      "configuredImage": "frostflow-p5-communication",
+      "architecture": "arm64",
+      "repoDigests": [
+        "frostflow-p5-communication@sha256:08dbeb6ef1e8bbd5f6c135be891eba942fa1b0b13818e54efbd749fbace2df8f"
+      ],
+      "state": "running",
+      "mounts": [
+        {
+          "Type": "bind",
+          "Name": null,
+          "Source": "/Users/danielmajzik/FrostFlow/bpmn",
+          "Destination": "/bpmn"
+        },
+        {
+          "Type": "bind",
+          "Name": null,
+          "Source": "/Users/danielmajzik/FrostFlow/runtime/p5/p5-02",
+          "Destination": "/data"
+        },
+        {
+          "Type": "bind",
+          "Name": null,
+          "Source": "/Users/danielmajzik/FrostFlow/dcr",
+          "Destination": "/dcr"
+        }
+      ]
+    },
+    {
+      "name": "frostflow-p5-zeebe-1",
+      "imageId": "sha256:f2a4737e0bbaacc0ed9ba31efc32262e81746988f9d5210cc2f5f9c66cdd9815",
+      "configuredImage": "camunda/zeebe:8.8.0",
+      "architecture": "arm64",
+      "repoDigests": [
+        "camunda/zeebe@sha256:f2a4737e0bbaacc0ed9ba31efc32262e81746988f9d5210cc2f5f9c66cdd9815"
+      ],
+      "state": "running",
+      "mounts": [
+        {
+          "Type": "volume",
+          "Name": "74ff5429b020ab0a6baa5c9d6e1f5cdd16222c94439fd535b379b822473e4739",
+          "Source": "/var/lib/docker/volumes/74ff5429b020ab0a6baa5c9d6e1f5cdd16222c94439fd535b379b822473e4739/_data",
+          "Destination": "/tmp"
+        },
+        {
+          "Type": "volume",
+          "Name": "frostflow-p5-p5-02-zeebe",
+          "Source": "/var/lib/docker/volumes/frostflow-p5-p5-02-zeebe/_data",
+          "Destination": "/usr/local/zeebe/data"
+        },
+        {
+          "Type": "volume",
+          "Name": "44bf307651585b3bb5bcddecdcfd0f20af2aae5c0b3cbc416fdf13dd8a68f082",
+          "Source": "/var/lib/docker/volumes/44bf307651585b3bb5bcddecdcfd0f20af2aae5c0b3cbc416fdf13dd8a68f082/_data",
+          "Destination": "/usr/local/zeebe/logs"
+        }
+      ]
+    },
+    {
+      "name": "frostflow-p5-elasticsearch-1",
+      "imageId": "sha256:93a9a7e1908f0c59ffce42ff494791bd785c36de40189759fc2a0ed7d6006c9d",
+      "configuredImage": "docker.elastic.co/elasticsearch/elasticsearch:8.16.0",
+      "architecture": "arm64",
+      "repoDigests": [
+        "docker.elastic.co/elasticsearch/elasticsearch@sha256:93a9a7e1908f0c59ffce42ff494791bd785c36de40189759fc2a0ed7d6006c9d"
+      ],
+      "state": "running",
+      "mounts": [
+        {
+          "Type": "volume",
+          "Name": "frostflow-p5-p5-02-elasticsearch",
+          "Source": "/var/lib/docker/volumes/frostflow-p5-p5-02-elasticsearch/_data",
+          "Destination": "/usr/share/elasticsearch/data"
+        }
+      ]
+    },
+    {
+      "name": "frostflow-p5-siddhi-1",
+      "imageId": "sha256:17dd32e19116d5219d6211a864693db4bf8d6eebaa13f18f50a1d5df5e3c43ad",
+      "configuredImage": "siddhiio/siddhi-runner-alpine:latest",
+      "architecture": "amd64",
+      "repoDigests": [
+        "siddhiio/siddhi-runner-alpine@sha256:17dd32e19116d5219d6211a864693db4bf8d6eebaa13f18f50a1d5df5e3c43ad"
+      ],
+      "state": "running",
+      "mounts": [
+        {
+          "Type": "bind",
+          "Name": null,
+          "Source": "/Users/danielmajzik/FrostFlow/siddhi-apps",
+          "Destination": "/apps"
+        }
+      ]
+    },
+    {
+      "name": "frostflow-p5-operate-1",
+      "imageId": "sha256:3ef9717192aedbccb66b767577bdf29937ba816d35edba2423adce19aafdaa91",
+      "configuredImage": "camunda/operate:8.8.0",
+      "architecture": "arm64",
+      "repoDigests": [
+        "camunda/operate@sha256:3ef9717192aedbccb66b767577bdf29937ba816d35edba2423adce19aafdaa91"
+      ],
+      "state": "running",
+      "mounts": [
+        {
+          "Type": "volume",
+          "Name": "5235697aac415a531dc6d4930fdd7657bea2b87da8ab67369a3d8b090b343e03",
+          "Source": "/var/lib/docker/volumes/5235697aac415a531dc6d4930fdd7657bea2b87da8ab67369a3d8b090b343e03/_data",
+          "Destination": "/tmp"
+        },
+        {
+          "Type": "volume",
+          "Name": "a127be31d8d345c69dd4a46da7efe3b1ece56bfa67f3b0dd8b264d0fed901a09",
+          "Source": "/var/lib/docker/volumes/a127be31d8d345c69dd4a46da7efe3b1ece56bfa67f3b0dd8b264d0fed901a09/_data",
+          "Destination": "/usr/local/operate/logs"
+        }
+      ]
+    }
+  ],
+  "pythonLocal": "Python 3.12.14",
+  "pythonContainer": "Python 3.12.16"
+}

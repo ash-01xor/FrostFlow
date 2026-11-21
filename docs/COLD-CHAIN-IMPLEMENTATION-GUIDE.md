@@ -12,7 +12,15 @@
 
 **Ownership:** P1 — Ashvanth; P2 — Rahul Shanbhag; P3 — Arunima Garg; P4 — Abid; P5–P6 unassigned
 
-**Implemented checkpoint:** P1 preparation, P2 transport/Siddhi ETA risk and P3 receipt, inspection and admission are executable. Delivery risk counts three distinct fresh consecutive late ETA observations; it persists a quality hold and durable P4 handoff. Terminal rejection retains its incident and cannot be reopened by later risk. Container excursion/combined-risk CEP, independent Open-Meteo current conditions and P3 monitoring finalization are implemented in the [pre-P4 foundation](PRE-P4-FOUNDATION.md). Abid’s PR #10 P4 investigation awaits foundation adaptation; cooling/recovery and P5–P6 remain planned. P4 dispositions in current tests come from an explicitly labelled stand-in. See [verification commands and evidence](RUNNING.md#automated-verification).
+**Implemented checkpoint:** P1 preparation, P2 transport/Siddhi ETA risk, P3 receiving,
+P4 DCR investigation and P5 corrective fulfilment are executable. Risks establish a
+shared hold and durable P4 handoff; applied replacement/return dispositions authorize
+one P5 case. P5 requires original collection and, for replacement success, admission
+of a new linked shipment through P1–P3. Rejected/cancelled replacements fail fulfilment.
+Container excursion/combined-risk CEP, independent Open-Meteo current conditions and P3
+monitoring finalization are implemented in the [foundation](PRE-P4-FOUNDATION.md).
+Cooling/recovery automation and P6 claims remain planned. See the [P5 guide](P5-CORRECTIVE-FULFILMENT.md)
+and [verification commands/evidence](RUNNING.md#automated-verification) for tested revisions and limits.
 
 ## 1. What problem are we solving?
 
@@ -51,7 +59,7 @@ We will not build route optimisation, physical sensors, detailed refrigeration p
 
 ## 3. How the system will work
 
-This is the target P1–P6 design. The implemented checkpoint above distinguishes current P1–P3 delivery-risk behavior from future recovery, real DCR investigation and corrective/claim workflows.
+This is the target P1–P6 design. The implemented checkpoint above distinguishes implemented P1–P5 behavior from future cooling/recovery automation and P6 claims.
 
 1. The warehouse prepares a shipment and confirms loading before dispatch.
 2. During transport, simulated GPS and temperature data enter Siddhi alongside weather and ETA updates.
@@ -125,13 +133,13 @@ A delay alone does not prove damaged goods. The officer assesses the evidence. C
 
 ### Unassigned — P5: Corrective fulfilment · Camunda
 
-**Build:** authorised replacement/return → arrange goods or collection → confirm dispatch/booking → confirm delivery/collection → complete.
+**Implemented on branch `P5`:** applied P4 replacement/return → explicit collection booking → original collection acknowledgement in parallel with replacement preparation/transport/receiving → completed or failed outcome. See the [P5 guide](P5-CORRECTIVE-FULFILMENT.md), [model](../bpmn/corrective_fulfilment.bpmn)/[PDF](../bpmn/corrective_fulfilment.pdf) and [compliance artifacts](../compliance/p5/). Human ownership remains unassigned.
 
 - Reject corrective work without an authorised quality decision.
 - For replacement, create a new shipment linked to the original and reuse P1–P3.
 - For return, record collection arrangements and acknowledgement.
 - Track the original goods' disposition separately from replacement delivery.
-- Coordinate Siddhi's three detection patterns, the Open-Meteo adapter, and cooling-command forwarding. The P2 and P4 owners help connect these to the simulator and investigation.
+- The foundation already implements excursion/combined-risk/ETA detection and Open-Meteo current conditions. Automatic cooling/recovery and external simulator coordination remain separate shared tasks, with owners unconfirmed.
 
 **Must prove:** replacement/return follows authorisation and requires completion acknowledgement.
 
@@ -162,7 +170,7 @@ Each person also models their process's compliance rules as a DCR graph and chec
 
 | Pattern | What Siddhi checks | Result |
 | --- | --- | --- |
-| Temperature excursion (implemented assessment) | Three distinct consecutive fresh readings above the snapshotted threshold span 10 s, with at most 10 s gaps | Persist assessment hold and versioned future-P4 handoff; no DCR case yet |
+| Temperature excursion (implemented assessment) | Three distinct consecutive fresh readings above the snapshotted threshold span 10 s, with at most 10 s gaps | Persist assessment hold and versioned P4 handoff; P4 opens/updates its DCR case |
 | Combined transport risk (implemented assessment) | Current-revision persistent fresh late ETA, three rising readings over 10 s (≥0.5°C rise), eligible outdoor temperature ≥30°C | Urgent assessment, coalescing/escalating the current incident |
 | Missing container data (implemented watchdog) | No valid reading for 20 s, including after restart | Assessment hold; missing data never means normal |
 | Delivery risk | Repeated fresh ETA updates predict arrival after the delivery deadline | Start delay handling and quality assessment |

@@ -1,0 +1,36 @@
+{
+  "checkedAt": "2026-11-21T11:03:38.778402Z",
+  "site": "https://processdoctor.compute.dtu.dk/",
+  "method": "Browser UI via Playwright CLI, DCR Solution XML import; exact files explicitly uploaded; screenshots visually inspected",
+  "coverageThreshold": 100,
+  "model": {
+    "path": "compliance/p5/rules.xml",
+    "sha256": "ebaee7129094b6ef80e3b6b5cc15075bcbdd01bec7645d5796686a5ff96bfabb"
+  },
+  "positive": {
+    "path": "compliance/p5/execution-log.xes",
+    "sha256": "a5a7c3f6294941d4b15dba220c215e25eb30e0e0d4b7a8e8e268a395475da4dd",
+    "runId": "9347c2c8",
+    "traces": 5,
+    "variants": 4,
+    "conforming": 4,
+    "partiallyViolating": 0,
+    "violating": 0,
+    "totalStructuralViolations": 0,
+    "screenshot": "compliance/p5/processdoctor-conforming.png"
+  },
+  "negative": {
+    "path": "compliance/p5/synthetic-dispatch-only.xes",
+    "sha256": "95b8f2ba113374c9748503e292483d803b1b8ecb8250f147ec2972e3b53eb492",
+    "inputMode": "synthetic-forbidden-trace",
+    "traces": 1,
+    "variants": 1,
+    "conforming": 0,
+    "partiallyViolating": 1,
+    "violating": 0,
+    "totalStructuralViolations": 1,
+    "expected": "Premature successful fulfilment after dispatch, before replacement admission, must violate the model.",
+    "screenshot": "compliance/p5/processdoctor-negative.png"
+  },
+  "scope": "Only these exact model/log hashes. Real live traces and synthetic negative input were checked separately. This is external conformance checking, not execution of P5 or a real collection service."
+}

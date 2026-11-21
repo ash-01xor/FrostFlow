@@ -9,6 +9,7 @@ services:
       BPMN_FILE: /bpmn/shipment_preparation.bpmn
       P2_BPMN_FILE: /bpmn/transport.bpmn
       P3_BPMN_FILE: /bpmn/receiving.bpmn
+      P5_BPMN_FILE: /bpmn/corrective_fulfilment.bpmn
       REGISTRY_PATH: /data/registry.sqlite
       GPS_TICK_SECONDS: ${GPS_TICK_SECONDS:-5}
       P2_SIMULATOR_ENABLED: ${P2_SIMULATOR_ENABLED:-true}

@@ -1,0 +1,373 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" xmlns:di="http://www.omg.org/spec/DD/20100524/DI" xmlns:modeler="http://camunda.org/schema/modeler/1.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:zeebe="http://camunda.org/schema/zeebe/1.0" id="CorrectiveDefinitions" targetNamespace="http://cold-chain.example/bpmn" modeler:executionPlatform="Camunda Cloud" modeler:executionPlatformVersion="8.8.0">
+  <bpmn:process id="CorrectiveFulfilment" name="P5 Corrective fulfilment" isExecutable="true">
+    <bpmn:startEvent id="DispositionReceived" name="Applied P4 disposition">
+      <bpmn:outgoing>F_1</bpmn:outgoing>
+      <bpmn:messageEventDefinition id="DispositionReceivedDefinition" messageRef="Message_P5DispositionRecorded" />
+    </bpmn:startEvent>
+    <bpmn:serviceTask id="RegisterCorrective" name="Record corrective authorization">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="p5-register" retries="3" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>F_1</bpmn:incoming>
+      <bpmn:outgoing>F_2</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:intermediateCatchEvent id="WaitArrangement" name="Await arrangement">
+      <bpmn:incoming>F_2</bpmn:incoming>
+      <bpmn:outgoing>F_3</bpmn:outgoing>
+      <bpmn:messageEventDefinition id="WaitArrangementDefinition" messageRef="Message_P5ArrangementRequested" />
+    </bpmn:intermediateCatchEvent>
+    <bpmn:serviceTask id="RecordArrangement" name="Record booking and replacement request">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="p5-arrange" retries="3" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>F_3</bpmn:incoming>
+      <bpmn:outgoing>F_4</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:parallelGateway id="HandlingSplit" name="Track both goods" gatewayDirection="Diverging">
+      <bpmn:incoming>F_4</bpmn:incoming>
+      <bpmn:outgoing>F_Original</bpmn:outgoing>
+      <bpmn:outgoing>F_Replacement</bpmn:outgoing>
+    </bpmn:parallelGateway>
+    <bpmn:intermediateCatchEvent id="WaitCollection" name="Await original collection">
+      <bpmn:incoming>F_Original</bpmn:incoming>
+      <bpmn:outgoing>F_Collection</bpmn:outgoing>
+      <bpmn:messageEventDefinition id="WaitCollectionDefinition" messageRef="Message_P5ReturnCollected" />
+    </bpmn:intermediateCatchEvent>
+    <bpmn:serviceTask id="RecordCollection" name="Record original collection">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="p5-record-collection" retries="3" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>F_Collection</bpmn:incoming>
+      <bpmn:outgoing>F_Collected</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:exclusiveGateway id="ActionDecision" name="Replacement required?" default="F_Return">
+      <bpmn:incoming>F_Replacement</bpmn:incoming>
+      <bpmn:outgoing>F_Replace</bpmn:outgoing>
+      <bpmn:outgoing>F_Return</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:callActivity id="PrepareReplacement" name="Prepare replacement through P1">
+      <bpmn:extensionElements>
+        <zeebe:calledElement processId="ShipmentPreparation" bindingType="deployment" propagateAllParentVariables="false" propagateAllChildVariables="false" />
+        <zeebe:ioMapping>
+          <zeebe:input source="=replacementShipmentId" target="shipmentId" />
+        </zeebe:ioMapping>
+      </bpmn:extensionElements>
+      <bpmn:incoming>F_Replace</bpmn:incoming>
+      <bpmn:outgoing>F_Prepared</bpmn:outgoing>
+    </bpmn:callActivity>
+    <bpmn:serviceTask id="RecordDispatch" name="Record dispatch or cancellation">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="p5-record-dispatch" retries="3" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>F_Prepared</bpmn:incoming>
+      <bpmn:outgoing>F_Dispatched</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:exclusiveGateway id="DispatchDecision" name="Replacement dispatched?" default="F_Cancelled">
+      <bpmn:incoming>F_Dispatched</bpmn:incoming>
+      <bpmn:outgoing>F_WaitReceiving</bpmn:outgoing>
+      <bpmn:outgoing>F_Cancelled</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:intermediateCatchEvent id="WaitOutcome" name="Await P3 receiving outcome">
+      <bpmn:incoming>F_WaitReceiving</bpmn:incoming>
+      <bpmn:outgoing>F_Received</bpmn:outgoing>
+      <bpmn:messageEventDefinition id="WaitOutcomeDefinition" messageRef="Message_P5ReplacementOutcome" />
+    </bpmn:intermediateCatchEvent>
+    <bpmn:serviceTask id="RecordOutcome" name="Record admission or rejection">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="p5-record-outcome" retries="3" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>F_Received</bpmn:incoming>
+      <bpmn:outgoing>F_OutcomeRecorded</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:exclusiveGateway id="ReplacementMerge" name="Replacement paths merge" gatewayDirection="Converging">
+      <bpmn:incoming>F_Return</bpmn:incoming>
+      <bpmn:incoming>F_Cancelled</bpmn:incoming>
+      <bpmn:incoming>F_OutcomeRecorded</bpmn:incoming>
+      <bpmn:outgoing>F_ReplacementDone</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:parallelGateway id="HandlingJoin" name="Both outcomes recorded" gatewayDirection="Converging">
+      <bpmn:incoming>F_Collected</bpmn:incoming>
+      <bpmn:incoming>F_ReplacementDone</bpmn:incoming>
+      <bpmn:outgoing>F_Both</bpmn:outgoing>
+    </bpmn:parallelGateway>
+    <bpmn:serviceTask id="CompleteCorrective" name="Record corrective outcome">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="p5-complete" retries="3" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>F_Both</bpmn:incoming>
+      <bpmn:outgoing>F_Completed</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:exclusiveGateway id="OutcomeDecision" name="Fulfilled?" default="F_Failed">
+      <bpmn:incoming>F_Completed</bpmn:incoming>
+      <bpmn:outgoing>F_Succeeded</bpmn:outgoing>
+      <bpmn:outgoing>F_Failed</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:endEvent id="FulfilmentCompleted" name="Corrective fulfilment completed">
+      <bpmn:incoming>F_Succeeded</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:endEvent id="FulfilmentFailed" name="Corrective fulfilment failed">
+      <bpmn:incoming>F_Failed</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:sequenceFlow id="F_1" sourceRef="DispositionReceived" targetRef="RegisterCorrective" />
+    <bpmn:sequenceFlow id="F_2" sourceRef="RegisterCorrective" targetRef="WaitArrangement" />
+    <bpmn:sequenceFlow id="F_3" sourceRef="WaitArrangement" targetRef="RecordArrangement" />
+    <bpmn:sequenceFlow id="F_4" sourceRef="RecordArrangement" targetRef="HandlingSplit" />
+    <bpmn:sequenceFlow id="F_Original" sourceRef="HandlingSplit" targetRef="WaitCollection" />
+    <bpmn:sequenceFlow id="F_Collection" sourceRef="WaitCollection" targetRef="RecordCollection" />
+    <bpmn:sequenceFlow id="F_Collected" sourceRef="RecordCollection" targetRef="HandlingJoin" />
+    <bpmn:sequenceFlow id="F_Replacement" sourceRef="HandlingSplit" targetRef="ActionDecision" />
+    <bpmn:sequenceFlow id="F_Replace" sourceRef="ActionDecision" targetRef="PrepareReplacement" name="Replace">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">=correctiveAction = "REPLACE"</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="F_Return" sourceRef="ActionDecision" targetRef="ReplacementMerge" name="Return" />
+    <bpmn:sequenceFlow id="F_Prepared" sourceRef="PrepareReplacement" targetRef="RecordDispatch" />
+    <bpmn:sequenceFlow id="F_Dispatched" sourceRef="RecordDispatch" targetRef="DispatchDecision" />
+    <bpmn:sequenceFlow id="F_WaitReceiving" sourceRef="DispatchDecision" targetRef="WaitOutcome" name="Dispatched">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">=replacementDispatched = true</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="F_Cancelled" sourceRef="DispatchDecision" targetRef="ReplacementMerge" name="Cancelled" />
+    <bpmn:sequenceFlow id="F_Received" sourceRef="WaitOutcome" targetRef="RecordOutcome" />
+    <bpmn:sequenceFlow id="F_OutcomeRecorded" sourceRef="RecordOutcome" targetRef="ReplacementMerge" />
+    <bpmn:sequenceFlow id="F_ReplacementDone" sourceRef="ReplacementMerge" targetRef="HandlingJoin" />
+    <bpmn:sequenceFlow id="F_Both" sourceRef="HandlingJoin" targetRef="CompleteCorrective" />
+    <bpmn:sequenceFlow id="F_Completed" sourceRef="CompleteCorrective" targetRef="OutcomeDecision" />
+    <bpmn:sequenceFlow id="F_Succeeded" sourceRef="OutcomeDecision" targetRef="FulfilmentCompleted" name="Yes">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">=correctiveSucceeded = true</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="F_Failed" sourceRef="OutcomeDecision" targetRef="FulfilmentFailed" name="No" />
+  </bpmn:process>
+  <bpmn:message id="Message_P5DispositionRecorded" name="P5DispositionRecorded" />
+  <bpmn:message id="Message_P5ArrangementRequested" name="P5ArrangementRequested">
+    <bpmn:extensionElements>
+      <zeebe:subscription correlationKey="=correctiveId" />
+    </bpmn:extensionElements>
+  </bpmn:message>
+  <bpmn:message id="Message_P5ReturnCollected" name="P5ReturnCollected">
+    <bpmn:extensionElements>
+      <zeebe:subscription correlationKey="=correctiveId" />
+    </bpmn:extensionElements>
+  </bpmn:message>
+  <bpmn:message id="Message_P5ReplacementOutcome" name="P5ReplacementOutcome">
+    <bpmn:extensionElements>
+      <zeebe:subscription correlationKey="=correctiveId" />
+    </bpmn:extensionElements>
+  </bpmn:message>
+  <bpmndi:BPMNDiagram id="CorrectiveDiagram">
+    <bpmndi:BPMNPlane id="CorrectivePlane" bpmnElement="CorrectiveFulfilment">
+      <bpmndi:BPMNShape id="DispositionReceived_di" bpmnElement="DispositionReceived">
+        <dc:Bounds x="80" y="172" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="43.0" y="214" width="110" height="40" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="RegisterCorrective_di" bpmnElement="RegisterCorrective">
+        <dc:Bounds x="160" y="150" width="120" height="80" />
+        <bpmndi:BPMNLabel />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="WaitArrangement_di" bpmnElement="WaitArrangement">
+        <dc:Bounds x="340" y="172" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="303.0" y="214" width="110" height="40" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="RecordArrangement_di" bpmnElement="RecordArrangement">
+        <dc:Bounds x="430" y="150" width="130" height="80" />
+        <bpmndi:BPMNLabel />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="HandlingSplit_di" bpmnElement="HandlingSplit">
+        <dc:Bounds x="610" y="165" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="580.0" y="221" width="110" height="40" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="WaitCollection_di" bpmnElement="WaitCollection">
+        <dc:Bounds x="740" y="72" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="703.0" y="114" width="110" height="40" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="RecordCollection_di" bpmnElement="RecordCollection">
+        <dc:Bounds x="850" y="50" width="120" height="80" />
+        <bpmndi:BPMNLabel />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="ActionDecision_di" bpmnElement="ActionDecision">
+        <dc:Bounds x="710" y="365" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="680.0" y="317" width="110" height="40" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="PrepareReplacement_di" bpmnElement="PrepareReplacement">
+        <dc:Bounds x="820" y="350" width="140" height="80" />
+        <bpmndi:BPMNLabel />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="RecordDispatch_di" bpmnElement="RecordDispatch">
+        <dc:Bounds x="1020" y="350" width="120" height="80" />
+        <bpmndi:BPMNLabel />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DispatchDecision_di" bpmnElement="DispatchDecision">
+        <dc:Bounds x="1190" y="365" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1160.0" y="317" width="110" height="40" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="WaitOutcome_di" bpmnElement="WaitOutcome">
+        <dc:Bounds x="1320" y="372" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1283.0" y="414" width="110" height="40" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="RecordOutcome_di" bpmnElement="RecordOutcome">
+        <dc:Bounds x="1420" y="350" width="130" height="80" />
+        <bpmndi:BPMNLabel />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="ReplacementMerge_di" bpmnElement="ReplacementMerge">
+        <dc:Bounds x="1690" y="365" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1660.0" y="317" width="110" height="40" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="HandlingJoin_di" bpmnElement="HandlingJoin">
+        <dc:Bounds x="1850" y="165" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1725" y="170" width="110" height="40" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="CompleteCorrective_di" bpmnElement="CompleteCorrective">
+        <dc:Bounds x="1960" y="150" width="120" height="80" />
+        <bpmndi:BPMNLabel />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="OutcomeDecision_di" bpmnElement="OutcomeDecision">
+        <dc:Bounds x="2140" y="165" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="2110.0" y="221" width="110" height="40" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="FulfilmentCompleted_di" bpmnElement="FulfilmentCompleted">
+        <dc:Bounds x="2270" y="132" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="2233.0" y="174" width="110" height="40" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="FulfilmentFailed_di" bpmnElement="FulfilmentFailed">
+        <dc:Bounds x="2270" y="272" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="2233.0" y="314" width="110" height="40" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="F_1_di" bpmnElement="F_1">
+        <di:waypoint x="116" y="190.0" />
+        <di:waypoint x="160" y="190.0" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="F_2_di" bpmnElement="F_2">
+        <di:waypoint x="280" y="190.0" />
+        <di:waypoint x="340" y="190.0" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="F_3_di" bpmnElement="F_3">
+        <di:waypoint x="376" y="190.0" />
+        <di:waypoint x="430" y="190.0" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="F_4_di" bpmnElement="F_4">
+        <di:waypoint x="560" y="190.0" />
+        <di:waypoint x="610" y="190.0" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="F_Original_di" bpmnElement="F_Original">
+        <di:waypoint x="635" y="165" />
+        <di:waypoint x="635" y="90" />
+        <di:waypoint x="740" y="90" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="F_Collection_di" bpmnElement="F_Collection">
+        <di:waypoint x="776" y="90.0" />
+        <di:waypoint x="850" y="90.0" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="F_Collected_di" bpmnElement="F_Collected">
+        <di:waypoint x="970" y="90" />
+        <di:waypoint x="1875" y="90" />
+        <di:waypoint x="1875" y="165" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="F_Replacement_di" bpmnElement="F_Replacement">
+        <di:waypoint x="635" y="215" />
+        <di:waypoint x="635" y="390" />
+        <di:waypoint x="710" y="390" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="F_Replace_di" bpmnElement="F_Replace">
+        <di:waypoint x="760" y="390.0" />
+        <di:waypoint x="820" y="390.0" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="762" y="364" width="65" height="20" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="F_Return_di" bpmnElement="F_Return">
+        <di:waypoint x="735" y="415" />
+        <di:waypoint x="735" y="570" />
+        <di:waypoint x="1715" y="570" />
+        <di:waypoint x="1715" y="415" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="740" y="525" width="65" height="20" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="F_Prepared_di" bpmnElement="F_Prepared">
+        <di:waypoint x="960" y="390.0" />
+        <di:waypoint x="1020" y="390.0" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="F_Dispatched_di" bpmnElement="F_Dispatched">
+        <di:waypoint x="1140" y="390.0" />
+        <di:waypoint x="1190" y="390.0" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="F_WaitReceiving_di" bpmnElement="F_WaitReceiving">
+        <di:waypoint x="1240" y="390.0" />
+        <di:waypoint x="1320" y="390.0" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1245" y="364" width="65" height="20" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="F_Cancelled_di" bpmnElement="F_Cancelled">
+        <di:waypoint x="1215" y="415" />
+        <di:waypoint x="1215" y="490" />
+        <di:waypoint x="1715" y="490" />
+        <di:waypoint x="1715" y="415" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1270" y="467" width="65" height="20" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="F_Received_di" bpmnElement="F_Received">
+        <di:waypoint x="1356" y="390.0" />
+        <di:waypoint x="1420" y="390.0" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="F_OutcomeRecorded_di" bpmnElement="F_OutcomeRecorded">
+        <di:waypoint x="1550" y="390.0" />
+        <di:waypoint x="1690" y="390.0" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="F_ReplacementDone_di" bpmnElement="F_ReplacementDone">
+        <di:waypoint x="1740" y="390" />
+        <di:waypoint x="1875" y="390" />
+        <di:waypoint x="1875" y="215" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="F_Both_di" bpmnElement="F_Both">
+        <di:waypoint x="1900" y="190.0" />
+        <di:waypoint x="1960" y="190.0" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="F_Completed_di" bpmnElement="F_Completed">
+        <di:waypoint x="2080" y="190.0" />
+        <di:waypoint x="2140" y="190.0" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="F_Succeeded_di" bpmnElement="F_Succeeded">
+        <di:waypoint x="2190" y="190" />
+        <di:waypoint x="2230" y="190" />
+        <di:waypoint x="2230" y="150" />
+        <di:waypoint x="2270" y="150" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="2225" y="125" width="65" height="20" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="F_Failed_di" bpmnElement="F_Failed">
+        <di:waypoint x="2165" y="215" />
+        <di:waypoint x="2165" y="290" />
+        <di:waypoint x="2270" y="290" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="2205" y="264" width="65" height="20" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+</bpmn:definitions>

@@ -491,7 +491,7 @@ class QualityService:
             record = Registry.read(db, incident["shipmentId"])
             pending = incident["pendingDecision"]
             payload = self._decision_payload(pending)
-            journal(db, record, incident, "DispositionRecorded", actor=pending["officer"],
+            disposition = journal(db, record, incident, "DispositionRecorded", actor=pending["officer"],
                     payload=dict(payload, decision=pending["decision"],
                                  evidence=[e["deliveryId"] for e in incident["evidence"]]),
                     event_id=f"P4:{incident_id}:DispositionRecorded:{pending['eventId']}",
@@ -503,6 +503,7 @@ class QualityService:
                 assessedEvidenceVersion=pending["expectedEvidenceVersion"],
                 qualityStatusEventId=pending["eventId"]))
             save_incident(db, incident)
+            self.registry.authorize_corrective(db, record, incident, disposition)
             event = json.loads(db.execute("SELECT data FROM events WHERE id=?",
                                           (pending["journalEventId"],)).fetchone()[0])
         return incident, event

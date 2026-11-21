@@ -4,6 +4,10 @@
 
 Abid owns P4. [Original PR #10](https://github.com/ash-01xor/FrostFlow/pull/10) and its models, code and historical evidence remain in Git history. [Revert PR #11](https://github.com/ash-01xor/FrostFlow/pull/11) is merged as `f475904`; removal commit `31ad23b` is retained. Foundation [PR #9](https://github.com/ash-01xor/FrostFlow/pull/9) passed review and merged as `ae941cc`; replacement PR #12 implements this handover. Its integration verification is recorded separately from the foundation checks; PR #12 merged as `70d1a1b` and its exact merged-main smoke passed (see [record](../compliance/merged-main-verification.json)).
 
+P5 subsequently adds an atomic applied-disposition handoff without changing this v1
+assessment intake contract; see the [P5 guide](P5-CORRECTIVE-FULFILMENT.md). P6 and
+automatic cooling/recovery remain future work.
+
 ## Restoration instructions (historical handover)
 
 The instructions in this section describe the original reintegration steps, now implemented by PR #12. Its current Compose default is the compatible local P4 consumer, and CLI 19 runs investigation; the empty default below describes the foundation-only checkpoint.

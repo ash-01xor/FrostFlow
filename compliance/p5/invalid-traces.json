@@ -1,0 +1,157 @@
+{
+  "work-without-disposition": {
+    "events": [
+      "ReplacementAuthorized"
+    ],
+    "result": {
+      "valid": false,
+      "accepting": false,
+      "violationIndex": 0,
+      "event": "ReplacementAuthorized",
+      "reason": "condition not met: ReplaceDisposition"
+    }
+  },
+  "booking-without-authorization": {
+    "events": [
+      "CollectionBooked"
+    ],
+    "result": {
+      "valid": false,
+      "accepting": false,
+      "violationIndex": 0,
+      "event": "CollectionBooked",
+      "reason": "condition not met: ReplacementAuthorized"
+    }
+  },
+  "collection-before-booking": {
+    "events": [
+      "ReturnDisposition",
+      "ReturnAuthorized",
+      "ReturnCollected"
+    ],
+    "result": {
+      "valid": false,
+      "accepting": false,
+      "violationIndex": 2,
+      "event": "ReturnCollected",
+      "reason": "condition not met: CollectionBooked"
+    }
+  },
+  "return-completion-without-collection": {
+    "events": [
+      "ReturnDisposition",
+      "ReturnAuthorized",
+      "CollectionBooked",
+      "CorrectiveFulfilmentCompleted"
+    ],
+    "result": {
+      "valid": false,
+      "accepting": false,
+      "violationIndex": 3,
+      "event": "CorrectiveFulfilmentCompleted",
+      "reason": "condition not met: ReturnCollected"
+    }
+  },
+  "replacement-dispatch-is-not-delivery": {
+    "events": [
+      "ReplaceDisposition",
+      "ReplacementAuthorized",
+      "CollectionBooked",
+      "ReplacementRequested",
+      "ReplacementDispatched",
+      "ReturnCollected",
+      "CorrectiveFulfilmentCompleted"
+    ],
+    "result": {
+      "valid": false,
+      "accepting": false,
+      "violationIndex": 6,
+      "event": "CorrectiveFulfilmentCompleted",
+      "reason": "condition not met: ReplacementAdmitted"
+    }
+  },
+  "rejected-replacement-is-not-success": {
+    "events": [
+      "ReplaceDisposition",
+      "ReplacementAuthorized",
+      "CollectionBooked",
+      "ReplacementRequested",
+      "ReplacementDispatched",
+      "ReplacementRejected",
+      "ReturnCollected",
+      "CorrectiveFulfilmentCompleted"
+    ],
+    "result": {
+      "valid": false,
+      "accepting": false,
+      "violationIndex": 7,
+      "event": "CorrectiveFulfilmentCompleted",
+      "reason": "activity is excluded"
+    }
+  },
+  "cancelled-replacement-is-not-success": {
+    "events": [
+      "ReplaceDisposition",
+      "ReplacementAuthorized",
+      "CollectionBooked",
+      "ReplacementRequested",
+      "ReplacementCancelled",
+      "ReturnCollected",
+      "CorrectiveFulfilmentCompleted"
+    ],
+    "result": {
+      "valid": false,
+      "accepting": false,
+      "violationIndex": 6,
+      "event": "CorrectiveFulfilmentCompleted",
+      "reason": "activity is excluded"
+    }
+  },
+  "return-cannot-request-replacement": {
+    "events": [
+      "ReturnDisposition",
+      "ReturnAuthorized",
+      "CollectionBooked",
+      "ReplacementRequested"
+    ],
+    "result": {
+      "valid": false,
+      "accepting": false,
+      "violationIndex": 3,
+      "event": "ReplacementRequested",
+      "reason": "activity is excluded"
+    }
+  },
+  "failure-needs-negative-outcome": {
+    "events": [
+      "ReplaceDisposition",
+      "ReplacementAuthorized",
+      "CollectionBooked",
+      "ReplacementRequested",
+      "ReturnCollected",
+      "CorrectiveFulfilmentFailed"
+    ],
+    "result": {
+      "valid": false,
+      "accepting": false,
+      "violationIndex": 5,
+      "event": "CorrectiveFulfilmentFailed",
+      "reason": "condition not met: ReplacementCancelled"
+    }
+  },
+  "booking-cannot-repeat": {
+    "events": [
+      "ReturnDisposition",
+      "ReturnAuthorized",
+      "CollectionBooked",
+      "CollectionBooked"
+    ],
+    "result": {
+      "valid": false,
+      "accepting": false,
+      "violationIndex": 3,
+      "event": "CollectionBooked",
+      "reason": "activity is excluded"
+    }
+  }
+}

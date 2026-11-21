@@ -12,12 +12,13 @@ FrostFlow follows chilled goods from warehouse preparation through transport, re
 | P2 — Transport and delivery | Camunda / Zeebe | Rahul |
 | P3 — Receiving and stock admission | Camunda / Zeebe | Arunima Garg |
 | P4 — Quality investigation | DCR | Abid |
+| P5 — Corrective fulfilment | Camunda / Zeebe | Daniel |
 
 P1 reserves stock and dispatches shipments. P2 tracks transport and releases the vehicle after physical receipt. P3 inspects goods and admits them into separate receiving inventory. Transport or monitoring risks place goods on hold; P4 investigates and decides release, replacement or return before admission can proceed.
 
 Siddhi evaluates transport and container telemetry. Optional TomTom traffic ETAs and Open-Meteo current conditions provide external context. P4 uses a local DCR engine by default; dcrgraphs.net repository mode is also supported.
 
-P5 corrective fulfilment and P6 supplier claims are planned. Automatic cooling/recovery integration and an external physical simulator remain future work.
+P5 consumes applied P4 replacement/return decisions, books original-goods collection and reuses P1–P3 for linked replacements. Replacement success requires collection and stock admission of the new goods; rejection/cancellation produces a failed outcome. P6 supplier claims are planned. Automatic cooling/recovery integration and an external physical simulator remain future work.
 
 ## Run locally
 
@@ -46,7 +47,7 @@ Reuse the existing `.venv`, or create it once with `python3.12 -m venv .venv`:
 
 Live checks require the datasets and settings in the [verification instructions](docs/RUNNING.md#automated-verification). Results identify their tested revisions and distinguish offline tests, live execution, local replay and external conformance; see the [evidence index](docs/RUNNING.md#evidence-what-was-verified-and-where).
 
-The [merged-main smoke record](compliance/merged-main-verification.json) identifies the tested revision and results.
+The [merged-main smoke record](compliance/merged-main-verification.json) identifies the tested revision and results. The [P5 verification record](compliance/p5/verification.json) covers this branch’s corrective workflow, including live engine execution and separate local/external conformance checks.
 
 ## Repository and documentation
 
@@ -57,6 +58,7 @@ The [merged-main smoke record](compliance/merged-main-verification.json) identif
 - [Implementation guide](docs/COLD-CHAIN-IMPLEMENTATION-GUIDE.md) — full P1–P6 scope.
 - [Integration agreement](docs/COLD-CHAIN-INTEGRATION-AGREEMENT.md) — shared contracts and safeguards.
 - [P4 guide](docs/P4-QUALITY-INVESTIGATION.md) — investigation behavior and interfaces.
+- [P5 guide](docs/P5-CORRECTIVE-FULFILMENT.md) — corrective workflow, API/menu controls and verification.
 - [Task board](project_notes/TASKS.md), [AI-use record](project_notes/AI-USAGE.md) and [agent instructions](AGENTS.md) — team workflow and project records.
 
 Changes go through feature branches and review. Credentials and generated runtime data stay untracked.

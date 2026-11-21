@@ -4,7 +4,7 @@
 
 **Purpose:** define how the six processes exchange information before their owners implement the connections. Read the [team implementation guide](COLD-CHAIN-IMPLEMENTATION-GUIDE.md) for scope, assignments, and stages.
 
-**Status:** shared contract for implemented P1–P4 and planned P5–P6 connections. Target handoffs for unimplemented processes are identified by their scope; a message name is not proof of a deployed consumer. Changes to shared messages must be reflected here and coordinated with affected owners.
+**Status:** shared contract for implemented P1–P5 and planned P6 connections. Target handoffs for unimplemented processes are identified by their scope; a message name is not proof of a deployed consumer. Changes to shared messages must be reflected here and coordinated with affected owners.
 
 ## 1. Common identifiers
 
@@ -19,6 +19,8 @@
 | `incidentId` | Identifies one investigation episode for a shipment. Multiple alerts can contribute to one active episode. |
 | `claimId` | Identifies one supplier claim; at most one claim per incident in the prototype. |
 | `originalShipmentId` | Present on replacement shipments; points to the original goods. |
+| `correctiveId` | One P5 case per applied P4 replacement/return disposition. |
+| `replacementForCorrectiveId` | The P5 case a replacement fulfils; retained even if that replacement receives its own incident and `correctiveId`. |
 | `eventId` | Identifies one event. Re-delivering it must not repeat the business effect. |
 | `commandId` | Identifies one requested simulator action and links its acknowledgement. |
 
@@ -77,11 +79,12 @@ The Python integration service delivers these messages to the relevant engine or
 | `TemperatureExcursionDetected` | Siddhi → P4 integration | Pattern start/end, temperature evidence | Establish hold, then open/update investigation. |
 | `DeliveryRiskDetected` | Siddhi → P2 and P4 integration | Latest ETA, deadline, supporting updates | Request dispatcher decision and establish quality assessment/hold. |
 | `RecoveryVerified` | Siddhi → P4 | Incident, cooling command, stable-reading interval | Add evidence; do not automatically release goods. |
-| `DispositionRecorded` | P4 → P3 and P5 | Incident, decision, officer, reason, evidence references | Implemented for P3 through `accept_quality_status` (current incident, assessed `expectedEvidenceVersion`) → `QualityStatusChanged`, plus a `DispositionRecorded` journal entry; P5 consumption is planned. |
-| `StockAdmitted` | P3 → shared log; P5 when replacement | Admission time and receiver; original link if applicable | Record stock admission; allow replacement fulfilment to progress. |
-| `GoodsRejected` | P3 → shared log; P5 when replacement | Incident and reason | Record rejection; a rejected replacement cannot count as successful fulfilment. |
+| `DispositionRecorded` | P4 → P3 and P5 | Incident, decision, officer, reason, evidence references | P3 receives `QualityStatusChanged` through `accept_quality_status`. On branch `P5`, journalling the applied `REPLACE`/`RETURN` decision also atomically creates one corrective case and queues `P5DispositionRecorded`; the deployed P5 message-start consumer checks that authorization. `RELEASE` and the quality-status test stand-in create no corrective work. |
+| `StockAdmitted` | P3 → shared log; P5 when replacement | Admission time and receiver; original and parent-corrective links | Admission and its `P5ReplacementOutcome` outbox are atomic; P5 validates the actual P3 journal event. |
+| `GoodsRejected` | P3 → shared log; P5 when replacement | Incident, reason and parent-corrective link | Inspection and quality rejection atomically queue `P5ReplacementOutcome`; neither can fulfil a replacement successfully. |
 | `ReturnCollected` | Manual/simulated collection → P5 | Incident, collector, collection time | Complete acknowledged return after matching the authorised booking. |
-| `CorrectiveFulfilmentCompleted` | P5 → shared log | Incident, action, replacement/return references, original-goods outcome | Record corrective outcome separately from investigation and claim closure. |
+| `CorrectiveFulfilmentCompleted` | P5 → shared log | Incident, action, replacement/return references, original-goods outcome | Requires original collection and either no replacement (return) or replacement admission. |
+| `CorrectiveFulfilmentFailed` | P5 → shared log | Incident, replacement rejection/cancellation, original collection | Record failure separately from investigation and claim closure; do not count rejected/cancelled replacements as fulfilment. |
 | `ClaimableLossRecorded` | Explicit user decision → P6 | Incident, loss description, evidence references | Create claim; an incident alone does not trigger a claim. |
 | `SupplierResponseRecorded` | Manual/simulated supplier → P6 | Claim, settlement/rejection, reason | Record outcome and permit claim closure. |
 
@@ -120,7 +123,7 @@ P1 accepts an order before checking stock. A shortage keeps a real P1 instance a
 
 Dispatch records the agreed `ShipmentDispatched` envelope and durable outbox entry together. Its payload is passed as `dispatchEvent` to P2's message start. P2's registration worker checks the event against the journal, persists its engine key and acknowledges the outbox. Repeated worker delivery reuses that registration; a different P2 instance is prevented from repeating the business effect. Message IDs and active-start correlation also suppress repeated engine starts within the supported retention period.
 
-The P2 manual receipt endpoint is usable only in P2-only runs (`P3_ARRIVAL_URL` unset); the normal local flow uses P3's physical-receipt endpoint to acknowledge P2. `start_journey` initializes a scripted route, a background tick writes GPS/ETA activities and durable Siddhi telemetry, and the final route point queues `ShipmentArrived` for the P2 catch and a separate P3 HTTP notification. TomTom remains optional. The local Siddhi app receives telemetry and emits correlated risk alerts after three distinct consecutive fresh late ETAs; the local scripted simulator acknowledges route commands forwarded by Siddhi. Each risk alert requires an explicit delay or alternative-route decision, and P2 applies route changes only after a matching simulator acknowledgement. P2's DCR rules and log are in `compliance/p2/`, and TomTom was verified live on 2026-11-15. The external simulator and the P4 consumer of the delivery-risk handoff remain outstanding. APIs return accepted status after durable queueing while workers may still be processing. Preserve the registry and engine data together. Dataset version 3 uses five product/batch warehouse inventory rows and a separate receiving inventory; legacy pooled-stock datasets are preserved and rejected by the updated service until a fresh project/directory is selected. The [dataset reference](RUNNING.md#demonstration-dataset) defines the seed values. Product/batch identity is recorded in activity payloads.
+The P2 manual receipt endpoint is usable only in P2-only runs (`P3_ARRIVAL_URL` unset); the normal local flow uses P3's physical-receipt endpoint to acknowledge P2. `start_journey` initializes a scripted route, a background tick writes GPS/ETA activities and durable Siddhi telemetry, and the final route point queues `ShipmentArrived` for the P2 catch and a separate P3 HTTP notification. TomTom remains optional. The local Siddhi app receives telemetry and emits correlated risk alerts after three distinct consecutive fresh late ETAs; the local scripted simulator acknowledges route commands forwarded by Siddhi. Each risk alert requires an explicit delay or alternative-route decision, and P2 applies route changes only after a matching simulator acknowledgement. P2's DCR rules and log are in `compliance/p2/`, and TomTom was verified live on 2026-11-15. P4 consumes the durable delivery-risk handoff; the external physical simulator remains outstanding. APIs return accepted status after durable queueing while workers may still be processing. Preserve the registry and engine data together. Dataset version 3 uses five product/batch warehouse inventory rows and a separate receiving inventory; legacy pooled-stock datasets are preserved and rejected by the updated service until a fresh project/directory is selected. The [dataset reference](RUNNING.md#demonstration-dataset) defines the seed values. Product/batch identity is recorded in activity payloads.
 
 ### P2 and P3 development handover
 
@@ -289,3 +292,62 @@ The [foundation specification](PRE-P4-FOUNDATION.md) defines the approved profil
 Loading verification starts a session with an immutable profile. Physical receipt closes it at a final sequence and promptly sends P2 acknowledgement. `p3-finalize-monitoring` keeps P3 at an explicit service task until evaluation reaches closure, or a 20-second timeout establishes a durable uncertainty hold. Admission rechecks closed/finalized monitoring and current quality permission in one transaction. Legacy shipments without a snapshot are labelled legacy/unmonitored and retain their original engine model.
 
 See [Abid’s P4 foundation handover](P4-FOUNDATION-HANDOVER.md) for intake, durable acknowledgements, assessed evidence versions, fixtures and reintegration requirements. The replacement P4 PR implements that boundary; its behaviour is summarised in the [P4 guide](P4-QUALITY-INVESTIGATION.md#contract-v1-behaviour-enforced-by-the-service).
+
+## P5 corrective fulfilment contract
+
+Branch `P5` adds `CorrectiveFulfilment` to the single communication service. An applied
+P4 `REPLACE` or `RETURN` decision creates one `correctiveId` per incident and queues
+`P5DispositionRecorded` in the same transaction as `DispositionRecorded` and the saved
+P4 decision. The message carries `correctiveId` and the exact `authorizationEvent`.
+P5 registers one engine instance and validates the durable authorization. P4 closure
+is independent of P5 completion. Releases and `/integrations/p4/quality-status` test
+inputs do not authorize P5. Previously finalized P4 decisions are not backfilled.
+
+- `GET /corrective-fulfilments?originalShipmentId=<id>` lists cases (filter optional).
+  `GET /corrective-fulfilments/<correctiveId>` shows the durable case, booking, accepted
+  inputs, original-goods status, replacement result and engine key.
+- `POST /corrective-fulfilments/<id>/arrange`: `eventId`, UTC `occurredAt`, `actor`,
+  `collector`, `bookingReference`, UTC `scheduledAt`. For `REPLACE`, also send a
+  `replacement` object containing only new `shipmentId`, new `journeyId`, `vehicleId`,
+  `routeId` and UTC `deliveryDeadline`. Arrangement time cannot precede P4 authorization.
+  P5 copies the original product, batch, complete
+  crate quantity and recipient; substitutes, partial replacements and new batches are
+  outside scope. `RETURN` refuses replacement fields. The transaction reserves the
+  replacement identity and vehicle, creates the linked shipment, and queues
+  `P5ArrangementRequested` with `correctiveId`/`correctiveInput`. No stock is allocated
+  until P1 checks it. Ordinary `/shipments` rejects replacement links. The replacement's
+  `replacementForCorrectiveId` preserves its parent independently of any later P4
+  incident and corrective case of its own. P2's dispatch/arrival and P3's receiving
+  events retain these references; the arrival receiver checks them against the durable
+  P2 arrival snapshot so delayed retries remain valid after later quality changes.
+- P5's arrangement worker records `CollectionBooked` and, for replacement,
+  `ReplacementRequested`. A parallel branch calls the co-deployed `ShipmentPreparation`
+  using deployment binding and an explicit child `shipmentId` mapping. Child variables
+  do not overwrite parent variables. P1 keeps its loading/dispatch/stock-wait guards;
+  P2 and P3 use their existing durable handoffs. Cancellation records a failed
+  replacement result; dispatch records `ReplacementDispatched` and starts the wait for
+  P3. P3 admission/rejection atomically queues `P5ReplacementOutcome` with the actual
+  journal event. P5 checks that durable event and records `ReplacementAdmitted` or
+  `ReplacementRejected`. Arrival, physical receipt and dispatch alone cannot fulfil it.
+- `POST /corrective-fulfilments/<id>/collect`: `eventId`, UTC `occurredAt`, `actor`,
+  `collector`, `bookingReference`, integer `quantityCollected`. It must match the
+  processed booking and full original quantity. P3 must have physically received and
+  rejected the original. Collection cannot precede booking or receipt. The receiver
+  queues `P5ReturnCollected`; only its P5 worker records `ReturnCollected` and sets
+  `originalGoodsStatus: COLLECTED`. This is a manual/simulated confirmation, not an
+  external collection service or inventory credit.
+
+Case states: `START_REQUESTED` → `AWAITING_ARRANGEMENT` → `ARRANGEMENT_REQUESTED` →
+`IN_PROGRESS` → `COMPLETED` or `FAILED`. The BPMN parallel join requires original
+collection and the replacement branch. Return needs no replacement. Replacement
+success requires `ADMITTED`; `REJECTED`/`CANCELLED` produces
+`CorrectiveFulfilmentFailed`, never `CorrectiveFulfilmentCompleted`. Both final outcomes
+retain original collection evidence. Failed replacement follow-up remains explicit
+future work; P5 creates no second replacement or supplier claim automatically.
+
+Both POSTs return **202 after durable acceptance**. Poll the case for processed effects.
+Each action is accepted once per case: identical event ID/time/payload retries reuse
+its original message, including after completion; conflicting action/ID reuse returns
+409. Invalid fields return 400; unknown cases return 404; not-ready returns 503.
+Outbox identities and 24-hour Zeebe message retention follow the existing recovery
+limits; do not retry uncertain engine starts by deleting case/shipment records.

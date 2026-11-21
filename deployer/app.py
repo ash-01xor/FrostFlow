@@ -1,4 +1,4 @@
-"""P1 preparation, P2 transport, P3 receiving and the P4 DCR quality investigation."""
+"""P1–P3 delivery, P4 DCR investigation and P5 corrective fulfilment."""
 
 import asyncio
 import math
@@ -14,6 +14,7 @@ from pyzeebe.errors import MessageAlreadyExistsError
 
 from dcr_client import make_dcr
 from quality import QualityService, create_blueprint
+from corrective import create_blueprint as corrective_blueprint
 from registry import Conflict, Registry
 from weather import WeatherAdapter
 from transport_integrations import TransportIntegrations, post_json, validate_p4_acknowledgement
@@ -38,6 +39,12 @@ JOB_TYPES = [
     "p3-admit-stock",
     "p3-record-quality-status",
     "p3-finalize-monitoring",
+    "p5-register",
+    "p5-arrange",
+    "p5-record-collection",
+    "p5-record-dispatch",
+    "p5-record-outcome",
+    "p5-complete",
 ]
 app = Flask(__name__)
 registry = Registry(os.getenv("REGISTRY_PATH", "runtime/registry.sqlite"))
@@ -59,6 +66,7 @@ def current_dcr():
 # P4: quality investigation executed in DCR (deployer/quality.py).
 quality = QualityService(lambda: registry, current_dcr)
 app.register_blueprint(create_blueprint(quality))
+app.register_blueprint(corrective_blueprint(lambda: registry, ready))
 client = None
 event_loop = None
 
@@ -132,7 +140,7 @@ def health():
         status="ready" if ready.is_set() else "starting",
         stage=3,
         processId=PROCESS_ID,
-        processIds=[PROCESS_ID, "ShipmentTransport", "ShipmentReceiving"],
+        processIds=[PROCESS_ID, "ShipmentTransport", "ShipmentReceiving", "CorrectiveFulfilment"],
         jobTypes=JOB_TYPES,
         integrations={
             "gps": "scripted-demo" if os.getenv("P2_SIMULATOR_ENABLED", "true").lower() == "true" else "disabled",
@@ -206,9 +214,9 @@ def p3_arrival():
     clean["arrival"] = {
         "recipientId": text_field(clean["arrival"], "recipientId"),
     }
-    for field in ("originalShipmentId", "incidentId"):
+    for field in ("originalShipmentId", "incidentId", "correctiveId", "replacementForCorrectiveId"):
         if field in notification:
-            clean[field] = text_field(notification, field)
+            clean[field] = text_field(notification, field, max_length=1000 if field == "incidentId" else 100)
     if ("originalShipmentId" in clean) != ("incidentId" in clean):
         raise ValueError("replacement links require both originalShipmentId and incidentId")
     accepted = registry.accept_p3_arrival(clean)
@@ -610,7 +618,10 @@ def manual_receipt_acknowledgement(shipment_id):
 
 
 async def check_stock(shipmentId, job: Job):
-    return registry.check_stock(shipmentId, job.process_instance_key, job.key)
+    result = registry.check_stock(shipmentId, job.process_instance_key, job.key)
+    # Call-activity children have no HTTP run_process response to attach their key.
+    registry.attach_key(shipmentId, job.process_instance_key)
+    return result
 
 
 async def allocate_stock(shipmentId, job: Job):
@@ -729,6 +740,30 @@ async def p3_finalize_monitoring(shipmentId, job: Job):
     while not registry.finalize_monitoring(shipmentId):
         await asyncio.sleep(0.5)
     return {}
+
+
+async def p5_register(correctiveId, authorizationEvent, job: Job):
+    return registry.register_corrective(correctiveId, job.process_instance_key, authorizationEvent)
+
+
+async def p5_arrange(correctiveId, correctiveInput, job: Job):
+    return registry.arrange_corrective(correctiveId, job.process_instance_key, correctiveInput)
+
+
+async def p5_record_collection(correctiveId, correctiveInput, job: Job):
+    return registry.record_corrective_collection(correctiveId, job.process_instance_key, correctiveInput)
+
+
+async def p5_record_dispatch(correctiveId, job: Job):
+    return registry.record_replacement_dispatch(correctiveId, job.process_instance_key)
+
+
+async def p5_record_outcome(correctiveId, replacementOutcomeEvent, job: Job):
+    return registry.record_replacement_outcome(correctiveId, job.process_instance_key, replacementOutcomeEvent)
+
+
+async def p5_complete(correctiveId, job: Job):
+    return registry.complete_corrective(correctiveId, job.process_instance_key)
 
 
 async def record_delivery_risk(shipmentId, deliveryRiskEvent, job: Job):
@@ -922,6 +957,12 @@ async def main():
         p3_admit_stock,
         p3_record_quality_status,
         p3_finalize_monitoring,
+        p5_register,
+        p5_arrange,
+        p5_record_collection,
+        p5_record_dispatch,
+        p5_record_outcome,
+        p5_complete,
     )
     variables_by_job = {
         "p2-start-transport": ["shipmentId", "dispatchEvent"],
@@ -933,6 +974,12 @@ async def main():
         "p3-record-receipt": ["shipmentId", "receiptEvent"],
         "p3-record-inspection": ["shipmentId", "inspectionEvent"],
         "p3-record-quality-status": ["shipmentId", "qualityStatusEvent"],
+        "p5-register": ["correctiveId", "authorizationEvent"],
+        "p5-arrange": ["correctiveId", "correctiveInput"],
+        "p5-record-collection": ["correctiveId", "correctiveInput"],
+        "p5-record-dispatch": ["correctiveId"],
+        "p5-record-outcome": ["correctiveId", "replacementOutcomeEvent"],
+        "p5-complete": ["correctiveId"],
     }
     for job_type, handler in zip(JOB_TYPES, handlers):
         variables = variables_by_job.get(job_type, ["shipmentId"])
@@ -948,6 +995,7 @@ async def main():
                     os.getenv("BPMN_FILE", "bpmn/shipment_preparation.bpmn"),
                     os.getenv("P2_BPMN_FILE", "bpmn/transport.bpmn"),
                     os.getenv("P3_BPMN_FILE", "bpmn/receiving.bpmn"),
+                    os.getenv("P5_BPMN_FILE", "bpmn/corrective_fulfilment.bpmn"),
                 )
                 break
             except Exception as error:

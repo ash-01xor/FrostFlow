@@ -1,8 +1,8 @@
-# Running and testing P1, P2, P3 and P4
+# Running and testing P1–P5
 
 **P4 reintegration (replacement PR, branch `feat/p4-foundation-integration`):** Abid’s P4 from [PR #10](https://github.com/ash-01xor/FrostFlow/pull/10) was reverted by PR #11 so foundation [PR #9](https://github.com/ash-01xor/FrostFlow/pull/9) could merge first (merged as `ae941cc`). [PR #12](https://github.com/ash-01xor/FrostFlow/pull/12) restores P4 by reverting `31ad23b` and adapts it to the [foundation contract v1](P4-FOUNDATION-HANDOVER.md); see [sequencing](P4-INTEGRATION-SEQUENCING.md#checkpoint-4--replacement-p4-pr) and the [P4 guide](P4-QUALITY-INVESTIGATION.md). Review, merge and post-merge verification outcomes are recorded on PR #12.
 
-Run commands from the repository root. P1 responsible student: **Ashvanth**. The implemented scope includes shipment preparation, scripted P2 GPS/ETA and dispatcher decisions, P2-to-P3 arrival handoff, P3 receipt/inspection and separate receiving inventory, and the P1 stock shortage/cancellation paths. TomTom is optional; current deterministic verification uses local demo ETAs. P4's quality investigation runs as a DCR case ([P4 guide](P4-QUALITY-INVESTIGATION.md)); the physical/external simulator remains team integration work.
+Run commands from the repository root. P1 responsible student: **Ashvanth**. The implemented scope includes shipment preparation, scripted P2 GPS/ETA and dispatcher decisions, P2-to-P3 arrival handoff, P3 receipt/inspection and separate receiving inventory, and the P1 stock shortage/cancellation paths. TomTom is optional; current deterministic verification uses local demo ETAs. P4's quality investigation runs as a DCR case ([P4 guide](P4-QUALITY-INVESTIGATION.md)); P5 handles authorized corrective work ([P5 guide](P5-CORRECTIVE-FULFILMENT.md)); the physical/external simulator remains team integration work.
 
 ## Demonstration dataset
 
@@ -24,7 +24,7 @@ All products carry `temperatureProfileId: CHILLED-DEMO`. New shipments snapshot 
 
 `GET /stock` lists each product/batch, pack definition, initial crates and current availability. Its top-level `available` is only the sum across products; shipment eligibility uses the selected product/batch. The response also contains `datasetVersion: 3` and `shipmentCount`.
 
-The local dataset stores product definitions, warehouse batch inventory, separate recipient/product/batch receiving inventory, shipment/vehicle reservations, states and P1/P2/P3 engine keys, activity history, pending messages/acknowledgements and retry identities in SQLite under the selected `REGISTRY_DIR`. Zeebe/Elasticsearch store engine execution and inspection records in the matching Docker volumes. Generated databases and live-run evidence are ignored under `runtime/`. The committed `compliance/p1/` files are P1 conformance evidence, not P2 execution evidence.
+The local dataset stores product definitions, warehouse batch inventory, separate recipient/product/batch receiving inventory, shipment/vehicle reservations, states and P1/P2/P3/P5 engine keys, corrective cases/collection bookings, activity history, pending messages/acknowledgements and retry identities in SQLite under the selected `REGISTRY_DIR`. Zeebe/Elasticsearch store engine execution and inspection records in the matching Docker volumes. Generated databases and live-run evidence are ignored under `runtime/`. The committed `compliance/p1/` files are P1 conformance evidence, not P2 execution evidence.
 
 ## Start the application
 
@@ -35,7 +35,7 @@ docker compose up --build -d --wait --wait-timeout 180
 curl -s http://localhost:5001/health
 ```
 
-Wait for `status: ready` and `stage: 3`. All three BPMN resources must deploy before readiness. Operate is at <http://localhost:8081> (`demo` / `demo`). Open [P1](../bpmn/shipment_preparation.bpmn), [P2](../bpmn/transport.bpmn) and [P3](../bpmn/receiving.bpmn) in Camunda Modeler.
+Wait for `status: ready` and `stage: 3`. All four BPMN resources (P1/P2/P3/P5) must deploy before readiness. Operate is at <http://localhost:8081> (`demo` / `demo`). Open [P1](../bpmn/shipment_preparation.bpmn), [P2](../bpmn/transport.bpmn), [P3](../bpmn/receiving.bpmn) and [P5](../bpmn/corrective_fulfilment.bpmn) in Camunda Modeler.
 
 ### P2 integration settings
 
@@ -74,7 +74,7 @@ After starting a fresh stack, run:
 python tools/demo.py
 ```
 
-This terminal menu sends the same application requests as the API. It waits for state changes and prints P1/P2/P3 instance keys to find in Operate. Choose an action number, then shipment **A**, **B** or **C**. Creation also offers a choice of all five products; press Enter to use milk for the shortage scenario. After dispatch, the scripted route updates position/ETA and sends arrival automatically; the local P3 process starts from that durable notification and waits for physical receipt. Action **9** is an optional manual/test P2 arrival. Action **10** is a P2-only receipt shortcut for runs with P3 switched off. While P3 receiving is enabled (the default), it is refused with 409 and the CLI points you to **14**. Action **11** creates a test risk alert; **12** accepts the delay and **13** approves a different route. Action **14** confirms physical receipt in P3 and acknowledges P2, releasing the vehicle; action **15** submits a passing P3 inspection and attempts admission; action **16** only displays the separate receiving inventory—it does not trigger receipt or inspection. Use `python tools/demo.py --check` to check readiness and warehouse stock without changing data.
+This terminal menu sends the same application requests as the API. It waits for state changes and prints P1/P2/P3 instance keys to find in Operate. Choose an action number, then shipment **A**, **B**, **C** or an existing shipment ID (including a replacement). Creation also offers a choice of all five products; press Enter to use milk for the shortage scenario. After dispatch, the scripted route updates position/ETA and sends arrival automatically; the local P3 process starts from that durable notification and waits for physical receipt. Action **9** is an optional manual/test P2 arrival. Action **10** is a P2-only receipt shortcut for runs with P3 switched off. While P3 receiving is enabled (the default), it is refused with 409 and the CLI points you to **14**. Action **11** creates a test risk alert; **12** accepts the delay and **13** approves a different route. Action **14** confirms physical receipt in P3 and acknowledges P2, releasing the vehicle; action **15** submits a passing P3 inspection and attempts admission; action **16** only displays the separate receiving inventory—it does not trigger receipt or inspection. Use `python tools/demo.py --check` to check readiness and warehouse stock without changing data.
 
 P3 endpoints are `POST /shipments/<id>/receiving/receipt` (`eventId`, UTC `occurredAt`, `recipientId`, `quantityReceived`, `receiver`, optional `receiptReference`) and `POST /shipments/<id>/receiving/inspection` (`eventId`, UTC `occurredAt`, `inspector`, boolean `passed`, optional `notes`). Physical receipt must match the shipment's recipient and crate count. Only passed inspections with `qualityStatus` `CLEAR` or `RELEASED` add stock. `GET /receiving-stock` lists admitted goods, optionally filtered with `?recipientId=C-01`. `POST /integrations/p4/quality-status` accepts `PENDING`, `RELEASED` or `REJECTED` dispositions; `PENDING` holds stock admission and a subsequent release/rejection resumes the P3 process. This integration endpoint is internal-demo only and has no authentication.
 
@@ -100,7 +100,7 @@ Operate displays engine execution. The terminal represents the person submitting
 
 The dataset must be prepared before recording/presenting. The menu preserves existing data and does not reset containers or reservations. A used dataset may have unavailable vehicles even if stock remains; use the isolated-dataset instructions below to rehearse again.
 
-For the final **three-minute** project demo, reserve roughly 25 seconds for preparation. Build one connected story as later parts become available: dispatch → arrival/receipt → temperature incident → investigation/hold → authorised resolution → corrective work/claim → compliance results. Show process behaviour and evidence at each transition. P3 receiving and Abid’s P4 investigation (CLI **19**) are implemented; P5/P6 and the complete cross-process corrective workflow remain planned.
+For the final **three-minute** project demo, reserve roughly 25 seconds for preparation. Build one connected story as later parts become available: dispatch → arrival/receipt → temperature incident → investigation/hold → authorised resolution → corrective work/claim → compliance results. Show process behaviour and evidence at each transition. P3 receiving, Abid’s P4 investigation (CLI **19**) and P5 corrective fulfilment (CLI **20**) are implemented. P6 claims and automatic cooling/recovery remain planned.
 
 ### P3 compliance evidence
 
@@ -374,9 +374,10 @@ docker compose config --quiet
 npx --yes @camunda8/cli@4.6.1 bpmn lint bpmn/shipment_preparation.bpmn
 npx --yes @camunda8/cli@4.6.1 bpmn lint bpmn/transport.bpmn
 npx --yes @camunda8/cli@4.6.1 bpmn lint bpmn/receiving.bpmn
+npx --yes @camunda8/cli@4.6.1 bpmn lint bpmn/corrective_fulfilment.bpmn
 ```
 
-The offline suite includes the original **57 tests** plus foundation monitoring/weather regressions (P1, P2, P3, TomTom adapter, route model, quality hold and P2 DCR replay). The tests stub engine calls and external services; they do not replace the live runs below. On Windows without a local `grpc` install, run them in the service image: `docker run --rm -v "${PWD}:/repo" --entrypoint sh <project>-communication -c "cp -r /repo /tmp/r && cd /tmp/r && python -m unittest discover -s stage_tests -p 'test_*.py'"`.
+The offline suite includes the original **57 tests**, foundation monitoring/weather, P4 fault/race and P5 corrective/compliance regressions (P1, P2, P3, TomTom adapter, route model, quality hold and P2 DCR replay). The tests stub engine calls and external services; they do not replace the live runs below. On Windows without a local `grpc` install, run them in the service image: `docker run --rm -v "${PWD}:/repo" --entrypoint sh <project>-communication -c "cp -r /repo /tmp/r && cd /tmp/r && python -m unittest discover -s stage_tests -p 'test_*.py'"`.
 
 The Siddhi delivery-risk rule has its own check, which needs only Docker: `python stage_tests/check_siddhi_risk_rule.py`. It starts a throwaway Siddhi runner and proves that repeated delivery of one ETA event, an isolated late ETA, stale late ETAs and a run broken by an unavailable ETA raise no alert, while three distinct consecutive fresh late ETAs raise exactly one alert per route revision.
 
@@ -493,9 +494,11 @@ The reviewed five-product [execution log](../compliance/p1/execution-log.xes) an
 
 ```bash
 npx --yes @camunda8/cli@4.6.1 bpmn lint bpmn/receiving.bpmn
+npx --yes @camunda8/cli@4.6.1 bpmn lint bpmn/corrective_fulfilment.bpmn
 npx --yes bpmn-to-image@0.10.0 --title='P1 Shipment preparation' bpmn/shipment_preparation.bpmn:bpmn/shipment_preparation.pdf
 npx --yes bpmn-to-image@0.10.0 bpmn/transport.bpmn:bpmn/transport.pdf
 npx --yes bpmn-to-image@0.10.0 --title='P3 Receiving and stock admission' bpmn/receiving.bpmn:bpmn/receiving.pdf
+npx --yes bpmn-to-image@0.10.0 --title='P5 Corrective fulfilment' bpmn/corrective_fulfilment.bpmn:bpmn/corrective_fulfilment.pdf
 ```
 
 ### P4 investigation live run
@@ -610,3 +613,49 @@ curl http://localhost:5001/health
 ```
 
 Use new paired suffixes for any future fresh-data suite. Foundation PR #9 merged as `ae941cc`; P4 PR #12 merged as `70d1a1b`. The exact P4 merged revision passed the admission/hold-rejection smoke on the retained matched `review21` dataset (project `frostflow-p4-final`, local DCR/Siddhi, GPS tick 15 seconds and local demo ETAs); see [the current report](../compliance/merged-main-verification.json). This smoke uses labelled test dispositions; the separate [four-case P4 live verification](../compliance/p4/integration-review21.json) exercises actual investigation decisions. After each approved merge, rebuild from merged main using the same paired-dataset variables plus `up --build`, run `stage_tests/check_integration_smoke.py` with sufficient salad/chicken stock and free vehicles, and record the exact merged revision. Until that smoke passes, this is branch verification, not the final handover readiness claim. See [Abid's P4 handover](P4-FOUNDATION-HANDOVER.md).
+
+## P5 corrective fulfilment
+
+P5 deploys with P1/P2/P3 at startup (`P5_BPMN_FILE`, default
+`bpmn/corrective_fulfilment.bpmn`; Compose uses `/bpmn/corrective_fulfilment.bpmn`).
+There is no extra service, port or credential. New applied P4 replacement/return
+decisions create one case each. Historical decisions are not automatically backfilled;
+quality-status test inputs and releases do not start P5.
+
+Use CLI **20** on the original shipment to view the case, arrange collection and, for
+replacement, specify a new shipment/journey and free vehicle. P5 fixes product, batch,
+full quantity and recipient to the original. Use the existing shipment ID prompt and
+CLI **3**, **4**, **14**, **15** on the replacement to verify loading, dispatch, receive
+and inspect. P1 shortages retain their replenishment/cancellation wait. Use CLI **20**
+on the original again to acknowledge collection after P3 physical receipt and rejection.
+Booking reference, collector and full quantity must match. These are manual/simulated
+confirmations. Stock admission and original collection are independent requirements;
+P5 reports `FAILED` for cancelled/rejected replacements, even after original collection.
+A replacement's own P4 return has a separate P5 case; its parent reference is retained.
+
+Read the case via `GET /corrective-fulfilments?originalShipmentId=<id>` and
+`GET /corrective-fulfilments/<correctiveId>`. Inputs are
+`POST /corrective-fulfilments/<id>/arrange` and `POST .../<id>/collect`; exact fields and
+retry rules are in the [integration contract](COLD-CHAIN-INTEGRATION-AGREEMENT.md#p5-corrective-fulfilment-contract).
+A 202 is accepted, so poll the case for `IN_PROGRESS`, `originalGoodsStatus: COLLECTED`
+and eventually `COMPLETED`/`FAILED` with a bounded timeout. The CLI uses 30 seconds;
+live runners use named bounded waits and verify exported engine ends too.
+
+For the four-scenario fresh-data acceptance suite, use the [P5 sequential stack commands](P5-CORRECTIVE-FULFILMENT.md#live-verification-commands).
+It also completes the rejected replacement's separate return (five real P5 instances),
+checks P1 call-activity parent identity and exact -25 warehouse/+1 receiving effects.
+Run `9347c2c8` passed at `d118870`: 136 offline tests, five accepted local DCR traces and
+4/4 external conforming variants (zero structural violations; coverage 100). The separate
+synthetic dispatch-only trace produces one external structural violation as expected.
+The current P5 [verification report](../compliance/p5/verification.json) identifies code,
+model/log hashes and input modes. Local DCR replay uses:
+
+```bash
+.venv/bin/python compliance/check.py compliance/p5/execution-log.xes --model compliance/p5/rules.xml
+```
+
+P5 rules project the actual P4 disposition and P5 authorization into branch-specific
+activity names, preserving their journal identities/times. Failed corrective cases are
+valid compliance outcomes when all original collection and negative replacement
+obligations are recorded. Synthetic forbidden traces remain separate. Existing P1–P4
+reports retain their original scope; P5 evidence does not validate P6 or future recovery.

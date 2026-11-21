@@ -1,0 +1,273 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<dcrgraph title="P5 corrective fulfilment compliance" dataTypesStatus="hide">
+  <specification>
+    <resources>
+      <events>
+        <event id="ReplaceDisposition">
+          <custom>
+            <eventData />
+            <visualization>
+              <location xLoc="40" yLoc="40" />
+              <size width="170" height="150" />
+            </visualization>
+          </custom>
+        </event>
+        <event id="ReturnDisposition">
+          <custom>
+            <eventData />
+            <visualization>
+              <location xLoc="320" yLoc="40" />
+              <size width="170" height="150" />
+            </visualization>
+          </custom>
+        </event>
+        <event id="ReplacementAuthorized">
+          <custom>
+            <eventData />
+            <visualization>
+              <location xLoc="600" yLoc="40" />
+              <size width="170" height="150" />
+            </visualization>
+          </custom>
+        </event>
+        <event id="ReturnAuthorized">
+          <custom>
+            <eventData />
+            <visualization>
+              <location xLoc="880" yLoc="40" />
+              <size width="170" height="150" />
+            </visualization>
+          </custom>
+        </event>
+        <event id="CollectionBooked">
+          <custom>
+            <eventData />
+            <visualization>
+              <location xLoc="40" yLoc="270" />
+              <size width="170" height="150" />
+            </visualization>
+          </custom>
+        </event>
+        <event id="ReplacementRequested">
+          <custom>
+            <eventData />
+            <visualization>
+              <location xLoc="320" yLoc="270" />
+              <size width="170" height="150" />
+            </visualization>
+          </custom>
+        </event>
+        <event id="ReplacementDispatched">
+          <custom>
+            <eventData />
+            <visualization>
+              <location xLoc="600" yLoc="270" />
+              <size width="170" height="150" />
+            </visualization>
+          </custom>
+        </event>
+        <event id="ReplacementCancelled">
+          <custom>
+            <eventData />
+            <visualization>
+              <location xLoc="880" yLoc="270" />
+              <size width="170" height="150" />
+            </visualization>
+          </custom>
+        </event>
+        <event id="ReturnCollected">
+          <custom>
+            <eventData />
+            <visualization>
+              <location xLoc="40" yLoc="500" />
+              <size width="170" height="150" />
+            </visualization>
+          </custom>
+        </event>
+        <event id="ReplacementAdmitted">
+          <custom>
+            <eventData />
+            <visualization>
+              <location xLoc="320" yLoc="500" />
+              <size width="170" height="150" />
+            </visualization>
+          </custom>
+        </event>
+        <event id="ReplacementRejected">
+          <custom>
+            <eventData />
+            <visualization>
+              <location xLoc="600" yLoc="500" />
+              <size width="170" height="150" />
+            </visualization>
+          </custom>
+        </event>
+        <event id="CorrectiveFulfilmentCompleted">
+          <custom>
+            <eventData />
+            <visualization>
+              <location xLoc="880" yLoc="500" />
+              <size width="170" height="150" />
+            </visualization>
+          </custom>
+        </event>
+        <event id="CorrectiveFulfilmentFailed">
+          <custom>
+            <eventData />
+            <visualization>
+              <location xLoc="40" yLoc="730" />
+              <size width="170" height="150" />
+            </visualization>
+          </custom>
+        </event>
+      </events>
+      <labels>
+        <label id="ReplaceDisposition" />
+        <label id="ReturnDisposition" />
+        <label id="ReplacementAuthorized" />
+        <label id="ReturnAuthorized" />
+        <label id="CollectionBooked" />
+        <label id="ReplacementRequested" />
+        <label id="ReplacementDispatched" />
+        <label id="ReplacementCancelled" />
+        <label id="ReturnCollected" />
+        <label id="ReplacementAdmitted" />
+        <label id="ReplacementRejected" />
+        <label id="CorrectiveFulfilmentCompleted" />
+        <label id="CorrectiveFulfilmentFailed" />
+      </labels>
+      <labelMappings>
+        <labelMapping eventId="ReplaceDisposition" labelId="ReplaceDisposition" />
+        <labelMapping eventId="ReturnDisposition" labelId="ReturnDisposition" />
+        <labelMapping eventId="ReplacementAuthorized" labelId="ReplacementAuthorized" />
+        <labelMapping eventId="ReturnAuthorized" labelId="ReturnAuthorized" />
+        <labelMapping eventId="CollectionBooked" labelId="CollectionBooked" />
+        <labelMapping eventId="ReplacementRequested" labelId="ReplacementRequested" />
+        <labelMapping eventId="ReplacementDispatched" labelId="ReplacementDispatched" />
+        <labelMapping eventId="ReplacementCancelled" labelId="ReplacementCancelled" />
+        <labelMapping eventId="ReturnCollected" labelId="ReturnCollected" />
+        <labelMapping eventId="ReplacementAdmitted" labelId="ReplacementAdmitted" />
+        <labelMapping eventId="ReplacementRejected" labelId="ReplacementRejected" />
+        <labelMapping eventId="CorrectiveFulfilmentCompleted" labelId="CorrectiveFulfilmentCompleted" />
+        <labelMapping eventId="CorrectiveFulfilmentFailed" labelId="CorrectiveFulfilmentFailed" />
+      </labelMappings>
+      <subProcesses />
+    </resources>
+    <constraints>
+      <conditions>
+        <condition sourceId="CollectionBooked" targetId="ReplacementRequested" />
+        <condition sourceId="CollectionBooked" targetId="ReturnCollected" />
+        <condition sourceId="ReplaceDisposition" targetId="ReplacementAuthorized" />
+        <condition sourceId="ReplacementAdmitted" targetId="CorrectiveFulfilmentCompleted" />
+        <condition sourceId="ReplacementAuthorized" targetId="CollectionBooked" />
+        <condition sourceId="ReplacementAuthorized" targetId="ReplacementRequested" />
+        <condition sourceId="ReplacementCancelled" targetId="CorrectiveFulfilmentFailed" />
+        <condition sourceId="ReplacementDispatched" targetId="ReplacementAdmitted" />
+        <condition sourceId="ReplacementDispatched" targetId="ReplacementRejected" />
+        <condition sourceId="ReplacementRejected" targetId="CorrectiveFulfilmentFailed" />
+        <condition sourceId="ReplacementRequested" targetId="ReplacementCancelled" />
+        <condition sourceId="ReplacementRequested" targetId="ReplacementDispatched" />
+        <condition sourceId="ReturnAuthorized" targetId="CollectionBooked" />
+        <condition sourceId="ReturnCollected" targetId="CorrectiveFulfilmentCompleted" />
+        <condition sourceId="ReturnCollected" targetId="CorrectiveFulfilmentFailed" />
+        <condition sourceId="ReturnDisposition" targetId="ReturnAuthorized" />
+      </conditions>
+      <responses>
+        <response sourceId="CollectionBooked" targetId="ReturnCollected" />
+        <response sourceId="ReplaceDisposition" targetId="CorrectiveFulfilmentCompleted" />
+        <response sourceId="ReplaceDisposition" targetId="CorrectiveFulfilmentFailed" />
+        <response sourceId="ReplaceDisposition" targetId="ReplacementAuthorized" />
+        <response sourceId="ReplacementAuthorized" targetId="CollectionBooked" />
+        <response sourceId="ReplacementAuthorized" targetId="ReplacementRequested" />
+        <response sourceId="ReplacementDispatched" targetId="ReplacementAdmitted" />
+        <response sourceId="ReplacementDispatched" targetId="ReplacementRejected" />
+        <response sourceId="ReplacementRequested" targetId="ReplacementCancelled" />
+        <response sourceId="ReplacementRequested" targetId="ReplacementDispatched" />
+        <response sourceId="ReturnAuthorized" targetId="CollectionBooked" />
+        <response sourceId="ReturnDisposition" targetId="CorrectiveFulfilmentCompleted" />
+        <response sourceId="ReturnDisposition" targetId="CorrectiveFulfilmentFailed" />
+        <response sourceId="ReturnDisposition" targetId="ReturnAuthorized" />
+      </responses>
+      <includes />
+      <excludes>
+        <exclude sourceId="CollectionBooked" targetId="CollectionBooked" />
+        <exclude sourceId="CorrectiveFulfilmentCompleted" targetId="CollectionBooked" />
+        <exclude sourceId="CorrectiveFulfilmentCompleted" targetId="CorrectiveFulfilmentCompleted" />
+        <exclude sourceId="CorrectiveFulfilmentCompleted" targetId="CorrectiveFulfilmentFailed" />
+        <exclude sourceId="CorrectiveFulfilmentCompleted" targetId="ReplaceDisposition" />
+        <exclude sourceId="CorrectiveFulfilmentCompleted" targetId="ReplacementAdmitted" />
+        <exclude sourceId="CorrectiveFulfilmentCompleted" targetId="ReplacementAuthorized" />
+        <exclude sourceId="CorrectiveFulfilmentCompleted" targetId="ReplacementCancelled" />
+        <exclude sourceId="CorrectiveFulfilmentCompleted" targetId="ReplacementDispatched" />
+        <exclude sourceId="CorrectiveFulfilmentCompleted" targetId="ReplacementRejected" />
+        <exclude sourceId="CorrectiveFulfilmentCompleted" targetId="ReplacementRequested" />
+        <exclude sourceId="CorrectiveFulfilmentCompleted" targetId="ReturnAuthorized" />
+        <exclude sourceId="CorrectiveFulfilmentCompleted" targetId="ReturnCollected" />
+        <exclude sourceId="CorrectiveFulfilmentCompleted" targetId="ReturnDisposition" />
+        <exclude sourceId="CorrectiveFulfilmentFailed" targetId="CollectionBooked" />
+        <exclude sourceId="CorrectiveFulfilmentFailed" targetId="CorrectiveFulfilmentCompleted" />
+        <exclude sourceId="CorrectiveFulfilmentFailed" targetId="CorrectiveFulfilmentFailed" />
+        <exclude sourceId="CorrectiveFulfilmentFailed" targetId="ReplaceDisposition" />
+        <exclude sourceId="CorrectiveFulfilmentFailed" targetId="ReplacementAdmitted" />
+        <exclude sourceId="CorrectiveFulfilmentFailed" targetId="ReplacementAuthorized" />
+        <exclude sourceId="CorrectiveFulfilmentFailed" targetId="ReplacementCancelled" />
+        <exclude sourceId="CorrectiveFulfilmentFailed" targetId="ReplacementDispatched" />
+        <exclude sourceId="CorrectiveFulfilmentFailed" targetId="ReplacementRejected" />
+        <exclude sourceId="CorrectiveFulfilmentFailed" targetId="ReplacementRequested" />
+        <exclude sourceId="CorrectiveFulfilmentFailed" targetId="ReturnAuthorized" />
+        <exclude sourceId="CorrectiveFulfilmentFailed" targetId="ReturnCollected" />
+        <exclude sourceId="CorrectiveFulfilmentFailed" targetId="ReturnDisposition" />
+        <exclude sourceId="ReplaceDisposition" targetId="ReplaceDisposition" />
+        <exclude sourceId="ReplaceDisposition" targetId="ReturnAuthorized" />
+        <exclude sourceId="ReplaceDisposition" targetId="ReturnDisposition" />
+        <exclude sourceId="ReplacementAdmitted" targetId="CorrectiveFulfilmentFailed" />
+        <exclude sourceId="ReplacementAdmitted" targetId="ReplacementAdmitted" />
+        <exclude sourceId="ReplacementAdmitted" targetId="ReplacementRejected" />
+        <exclude sourceId="ReplacementAuthorized" targetId="ReplacementAuthorized" />
+        <exclude sourceId="ReplacementCancelled" targetId="CorrectiveFulfilmentCompleted" />
+        <exclude sourceId="ReplacementCancelled" targetId="ReplacementAdmitted" />
+        <exclude sourceId="ReplacementCancelled" targetId="ReplacementCancelled" />
+        <exclude sourceId="ReplacementCancelled" targetId="ReplacementDispatched" />
+        <exclude sourceId="ReplacementCancelled" targetId="ReplacementRejected" />
+        <exclude sourceId="ReplacementDispatched" targetId="ReplacementCancelled" />
+        <exclude sourceId="ReplacementDispatched" targetId="ReplacementDispatched" />
+        <exclude sourceId="ReplacementRejected" targetId="CorrectiveFulfilmentCompleted" />
+        <exclude sourceId="ReplacementRejected" targetId="ReplacementAdmitted" />
+        <exclude sourceId="ReplacementRejected" targetId="ReplacementRejected" />
+        <exclude sourceId="ReplacementRequested" targetId="ReplacementRequested" />
+        <exclude sourceId="ReturnAuthorized" targetId="ReturnAuthorized" />
+        <exclude sourceId="ReturnCollected" targetId="ReturnCollected" />
+        <exclude sourceId="ReturnDisposition" targetId="CorrectiveFulfilmentFailed" />
+        <exclude sourceId="ReturnDisposition" targetId="ReplaceDisposition" />
+        <exclude sourceId="ReturnDisposition" targetId="ReplacementAdmitted" />
+        <exclude sourceId="ReturnDisposition" targetId="ReplacementAuthorized" />
+        <exclude sourceId="ReturnDisposition" targetId="ReplacementCancelled" />
+        <exclude sourceId="ReturnDisposition" targetId="ReplacementDispatched" />
+        <exclude sourceId="ReturnDisposition" targetId="ReplacementRejected" />
+        <exclude sourceId="ReturnDisposition" targetId="ReplacementRequested" />
+        <exclude sourceId="ReturnDisposition" targetId="ReturnDisposition" />
+      </excludes>
+    </constraints>
+  </specification>
+  <runtime>
+    <marking>
+      <executed />
+      <included>
+        <event id="ReplaceDisposition" />
+        <event id="ReturnDisposition" />
+        <event id="ReplacementAuthorized" />
+        <event id="ReturnAuthorized" />
+        <event id="CollectionBooked" />
+        <event id="ReplacementRequested" />
+        <event id="ReplacementDispatched" />
+        <event id="ReplacementCancelled" />
+        <event id="ReturnCollected" />
+        <event id="ReplacementAdmitted" />
+        <event id="ReplacementRejected" />
+        <event id="CorrectiveFulfilmentCompleted" />
+        <event id="CorrectiveFulfilmentFailed" />
+      </included>
+      <pendingResponses />
+    </marking>
+  </runtime>
+</dcrgraph>

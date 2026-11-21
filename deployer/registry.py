@@ -12,6 +12,7 @@ from pathlib import Path
 
 from monitoring import profile, seconds
 from monitoring_registry import MonitoringRegistry
+from corrective_registry import CorrectiveRegistry
 
 
 def now():
@@ -29,7 +30,7 @@ class Conflict(Exception):
     pass
 
 
-class Registry(MonitoringRegistry):
+class Registry(MonitoringRegistry, CorrectiveRegistry):
     def __init__(self, path):
         self.path = str(path)
         Path(path).parent.mkdir(parents=True, exist_ok=True)
@@ -73,6 +74,8 @@ class Registry(MonitoringRegistry):
             db.execute("CREATE TABLE IF NOT EXISTS container_observations ("
                        "shipment_id TEXT NOT NULL, sequence INTEGER NOT NULL, data TEXT NOT NULL, ack TEXT, "
                        "PRIMARY KEY(shipment_id,sequence))")
+            db.execute("CREATE TABLE IF NOT EXISTS corrective_cases ("
+                       "id TEXT PRIMARY KEY, incident_id TEXT NOT NULL UNIQUE, data TEXT NOT NULL)")
             if not db.execute("SELECT 1 FROM products").fetchone():
                 catalog = json.loads(
                     Path(__file__).with_name("catalog.json").read_text()
@@ -197,7 +200,7 @@ class Registry(MonitoringRegistry):
                 ),
             },
         )
-        for optional in ("originalShipmentId", "incidentId"):
+        for optional in ("originalShipmentId", "incidentId", "correctiveId", "replacementForCorrectiveId"):
             if optional in record:
                 event[optional] = record[optional]
         if producer_event_id is not None:
@@ -331,35 +334,41 @@ class Registry(MonitoringRegistry):
 
     def create(self, data):
         with self.transaction() as db:
-            details = self.product(db, data.get("productId"), data.get("batchId"))
-            records = [
-                json.loads(r[0]) for r in db.execute("SELECT data FROM shipments")
-            ]
-            if any(r["shipmentId"] == data["shipmentId"] for r in records):
-                raise Conflict("shipmentId already exists; inspect its state")
-            if any(r["journeyId"] == data["journeyId"] for r in records):
-                raise Conflict("journeyId already exists")
-            if any(
-                r["vehicleId"] == data["vehicleId"]
-                and not r.get("vehicleReleased", False)
-                for r in records
-            ):
-                raise Conflict("vehicle is reserved by another shipment")
-            record = dict(
-                data,
-                state="START_REQUESTED",
-                qualityStatus="CLEAR",
-                processInstanceKey=None,
-                pendingCommand=None,
-                stockReserved=False,
-                vehicleReleased=False,
-                stockAttempt=0,
-                schemaVersion=3,
-            )
-            record.update({k: v for k, v in details.items() if k != "initialCrates"})
-            record["monitoringProfile"] = profile(record["productId"])
-            self.save(db, record)
-            self.event(db, record, "ShipmentCreated")
+            if any(field in data for field in ("originalShipmentId", "incidentId", "correctiveId", "replacementForCorrectiveId")):
+                raise Conflict("linked replacements must be arranged through P5")
+            return self.create_in_transaction(db, data)
+
+    def create_in_transaction(self, db, data):
+        """Create a shipment inside its caller's atomic business transaction."""
+        details = self.product(db, data.get("productId"), data.get("batchId"))
+        records = [
+            json.loads(r[0]) for r in db.execute("SELECT data FROM shipments")
+        ]
+        if any(r["shipmentId"] == data["shipmentId"] for r in records):
+            raise Conflict("shipmentId already exists; inspect its state")
+        if any(r["journeyId"] == data["journeyId"] for r in records):
+            raise Conflict("journeyId already exists")
+        if any(
+            r["vehicleId"] == data["vehicleId"]
+            and not r.get("vehicleReleased", False)
+            for r in records
+        ):
+            raise Conflict("vehicle is reserved by another shipment")
+        record = dict(
+            data,
+            state="START_REQUESTED",
+            qualityStatus="CLEAR",
+            processInstanceKey=None,
+            pendingCommand=None,
+            stockReserved=False,
+            vehicleReleased=False,
+            stockAttempt=0,
+            schemaVersion=3,
+        )
+        record.update({k: v for k, v in details.items() if k != "initialCrates"})
+        record["monitoringProfile"] = profile(record["productId"])
+        self.save(db, record)
+        self.event(db, record, "ShipmentCreated")
 
     def attach_key(self, shipment_id, key):
         with self.transaction() as db:
@@ -1188,7 +1197,7 @@ class Registry(MonitoringRegistry):
                 "occurredAt": accepted["occurredAt"],
                 "recordedAt": accepted["recordedAt"],
             }
-            for ref in ("originalShipmentId", "incidentId"):
+            for ref in ("originalShipmentId", "incidentId", "correctiveId", "replacementForCorrectiveId"):
                 if ref in record:
                     notification[ref] = record[ref]
             self.enqueue(db, notification_id, "ShipmentArrivalNotification", shipment_id,
@@ -1235,6 +1244,8 @@ class Registry(MonitoringRegistry):
                 or arrival.get("producerEventId") != notification["sourceEventId"]
                 or arrival.get("occurredAt") != notification["occurredAt"]
                 or arrival.get("recordedAt") != notification["recordedAt"]
+                or any(arrival.get(ref) != notification.get(ref) for ref in (
+                    "originalShipmentId", "incidentId", "correctiveId", "replacementForCorrectiveId"))
                 or any(
                     arrival.get("payload", {}).get(field) != value
                     for field, value in notification["arrival"].items()
@@ -1510,6 +1521,8 @@ class Registry(MonitoringRegistry):
                     event_id=f"P3:{shipment_id}:GoodsRejected",
                     payload={"reason": "inspection failed"},
                 )
+            if not passed:
+                self.notify_corrective_receiving(db, record, "REJECTED")
             self.save(db, record)
             return {"inspectionPassed": passed, **record}
 
@@ -1564,6 +1577,7 @@ class Registry(MonitoringRegistry):
                         "incidentId": record.get("qualityIncidentId"),
                     },
                 )
+                self.notify_corrective_receiving(db, record, "REJECTED")
                 self.save(db, record)
                 return {"admissionOutcome": "REJECTED"}
             if quality_status not in ("CLEAR", "RELEASED"):
@@ -1602,6 +1616,7 @@ class Registry(MonitoringRegistry):
                     ),
                 },
             )
+            self.notify_corrective_receiving(db, record, "ADMITTED")
             self.save(db, record)
             return {"admissionOutcome": "ADMITTED"}
 
