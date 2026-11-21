@@ -12,7 +12,7 @@ FrostFlow follows chilled goods from warehouse preparation through transport, re
 | P2 — Transport and delivery | Camunda / Zeebe | Rahul |
 | P3 — Receiving and stock admission | Camunda / Zeebe | Arunima Garg |
 | P4 — Quality investigation | DCR | Abid |
-| P5 — Corrective fulfilment | Camunda / Zeebe | Unassigned |
+| P5 — Corrective fulfilment | Camunda / Zeebe | Daniel |
 
 P1 reserves stock and dispatches shipments. P2 tracks transport and releases the vehicle after physical receipt. P3 inspects goods and admits them into separate receiving inventory. Transport or monitoring risks place goods on hold; P4 investigates and decides release, replacement or return before admission can proceed.
 
