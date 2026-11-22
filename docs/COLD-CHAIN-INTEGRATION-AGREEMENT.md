@@ -127,7 +127,7 @@ The P2 manual receipt endpoint is usable only in P2-only runs (`P3_ARRIVAL_URL` 
 
 ### P2 and P3 development handover
 
-P2 is owned by **Rahul Shanbhag** and P3 by **Arunima Garg**. Abid owns P4; P5/P6 and shared external integration owners remain unassigned. P2's current implementation is in `bpmn/transport.bpmn`, `deployer/app.py`, `deployer/registry.py`, `deployer/transport_integrations.py`, `tools/demo.py` and `stage_tests/`.
+P2 is owned by **Rahul Shanbhag** and P3 by **Arunima Garg**. Abid owns P4 and Daniel owns P5; P6 and shared external integration owners remain unassigned. P2's current implementation is in `bpmn/transport.bpmn`, `deployer/app.py`, `deployer/registry.py`, `deployer/transport_integrations.py`, `tools/demo.py` and `stage_tests/`.
 
 #### P2 transport implementation
 
@@ -295,7 +295,8 @@ See [Abid’s P4 foundation handover](P4-FOUNDATION-HANDOVER.md) for intake, dur
 
 ## P5 corrective fulfilment contract
 
-Branch `P5` adds `CorrectiveFulfilment` to the single communication service. An applied
+Daniel’s branch `P5`, published in [PR #14](https://github.com/ash-01xor/FrostFlow/pull/14) (open, non-draft and not merged
+as of 22 November 2026), adds `CorrectiveFulfilment` to the single communication service. An applied
 P4 `REPLACE` or `RETURN` decision creates one `correctiveId` per incident and queues
 `P5DispositionRecorded` in the same transaction as `DispositionRecorded` and the saved
 P4 decision. The message carries `correctiveId` and the exact `authorizationEvent`.

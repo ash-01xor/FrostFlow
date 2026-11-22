@@ -10,7 +10,7 @@
 
 **Submission:** 15 December 2026, 23:59, according to the course specification
 
-**Ownership:** P1 — Ashvanth; P2 — Rahul Shanbhag; P3 — Arunima Garg; P4 — Abid; P5–P6 unassigned
+**Ownership:** P1 — Ashvanth; P2 — Rahul Shanbhag; P3 — Arunima Garg; P4 — Abid; P5 — Daniel; P6 unassigned
 
 **Implemented checkpoint:** P1 preparation, P2 transport/Siddhi ETA risk, P3 receiving,
 P4 DCR investigation and P5 corrective fulfilment are executable. Risks establish a
@@ -20,7 +20,8 @@ of a new linked shipment through P1–P3. Rejected/cancelled replacements fail f
 Container excursion/combined-risk CEP, independent Open-Meteo current conditions and P3
 monitoring finalization are implemented in the [foundation](PRE-P4-FOUNDATION.md).
 Cooling/recovery automation and P6 claims remain planned. See the [P5 guide](P5-CORRECTIVE-FULFILMENT.md)
-and [verification commands/evidence](RUNNING.md#automated-verification) for tested revisions and limits.
+and [verification commands/evidence](RUNNING.md#automated-verification) for tested revisions and limits. Daniel’s P5 is published in [PR #14](https://github.com/ash-01xor/FrostFlow/pull/14), open,
+non-draft and not merged as of 22 November 2026.
 
 ## 1. What problem are we solving?
 
@@ -74,7 +75,7 @@ This demonstrates communication in both directions: **events affect processes, a
 
 ## 4. Who will do what?
 
-P1 is owned by Ashvanth, P2 by Rahul Shanbhag and P3 by Arunima Garg. Abid owns P4; assign P5/P6 and shared integration work. Every owner delivers the model, working implementation, checks and a short explanation. Shared tasks are coordinated by the process owner with help from teammates.
+P1 is owned by Ashvanth, P2 by Rahul Shanbhag and P3 by Arunima Garg. Abid owns P4 and Daniel owns P5; P6 and shared integration owners remain to be assigned. Every owner delivers the model, working implementation, checks and a short explanation. Shared tasks are coordinated by the process owner with help from teammates.
 
 ### Ashvanth — P1: Shipment preparation · Camunda
 
@@ -131,9 +132,9 @@ Abid is the confirmed P4 owner. **Status:** restored and adapted to the foundati
 
 A delay alone does not prove damaged goods. The officer assesses the evidence. Closing the investigation does not mean a replacement or claim has also finished.
 
-### Unassigned — P5: Corrective fulfilment · Camunda
+### Daniel — P5: Corrective fulfilment · Camunda
 
-**Implemented on branch `P5`:** applied P4 replacement/return → explicit collection booking → original collection acknowledgement in parallel with replacement preparation/transport/receiving → completed or failed outcome. See the [P5 guide](P5-CORRECTIVE-FULFILMENT.md), [model](../bpmn/corrective_fulfilment.bpmn)/[PDF](../bpmn/corrective_fulfilment.pdf) and [compliance artifacts](../compliance/p5/). Human ownership remains unassigned.
+**Implemented in [PR #14](https://github.com/ash-01xor/FrostFlow/pull/14) (branch `P5`; open, non-draft and not merged as of 22 November 2026):** applied P4 replacement/return → explicit collection booking → original collection acknowledgement in parallel with replacement preparation/transport/receiving → completed or failed outcome. See the [P5 guide](P5-CORRECTIVE-FULFILMENT.md), [model](../bpmn/corrective_fulfilment.bpmn)/[PDF](../bpmn/corrective_fulfilment.pdf) and [compliance artifacts](../compliance/p5/). Daniel is the confirmed P5 owner.
 
 - Reject corrective work without an authorised quality decision.
 - For replacement, create a new shipment linked to the original and reuse P1–P3.
