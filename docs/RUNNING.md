@@ -498,7 +498,7 @@ npx --yes @camunda8/cli@4.6.1 bpmn lint bpmn/corrective_fulfilment.bpmn
 npx --yes bpmn-to-image@0.10.0 --title='P1 Shipment preparation' bpmn/shipment_preparation.bpmn:bpmn/shipment_preparation.pdf
 npx --yes bpmn-to-image@0.10.0 bpmn/transport.bpmn:bpmn/transport.pdf
 npx --yes bpmn-to-image@0.10.0 --title='P3 Receiving and stock admission' bpmn/receiving.bpmn:bpmn/receiving.pdf
-npx --yes bpmn-to-image@0.10.0 --title='P5 Corrective fulfilment' bpmn/corrective_fulfilment.bpmn:bpmn/corrective_fulfilment.pdf
+npx --yes bpmn-to-image@0.10.0 --min-dimensions=2400x800 --title='P5 Corrective fulfilment' bpmn/corrective_fulfilment.bpmn:bpmn/corrective_fulfilment.pdf
 ```
 
 ### P4 investigation live run

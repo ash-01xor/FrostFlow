@@ -1207,8 +1207,8 @@
   "additionalValidation": {
     "composeConfig": "passed",
     "p5BpmnLint": "zero issues with @camunda8/cli@4.6.1",
-    "modelPdf": "exported with bpmn-to-image@0.10.0; rendered with Poppler and visually inspected",
-    "pdfHash": "dc45ef784bf9bae7403dd902185a44de3f044bc8cb99785810abe07ab8e51ef3",
+    "modelPdf": "re-exported on 2026-11-22 with bpmn-to-image@0.10.0 --min-dimensions=2400x800; full page and collection-task detail rendered with Poppler and visually inspected; unclipped",
+    "pdfHash": "cfb5e0d273055c370c2d546c8240e9b14bc97dc799d04e6d06863cbcd4bcd7ea",
     "localReplay": "compliance/p5/local-replay.json",
     "runningApplicationModelCatalogueHashes": "16/16 match; environment.json",
     "cli": "passed: real CLI option 20 selected/viewed the completed original case; existing-ID option 2 selected/viewed its replacement (read-only scripted terminal input)"
@@ -1220,5 +1220,17 @@
     "scope": "earlier code; inspection-rejected replacement; not validation of final parent-link fix",
     "rawEvidence": "runtime/p5-compliance/evidence.json",
     "matchedDataset": "p5-01 (preserved)"
+  },
+  "pdfReviewCorrection": {
+    "checkedAt": "2026-11-22T12:53:18.866224Z",
+    "pr": "https://github.com/ash-01xor/FrostFlow/pull/14",
+    "finding": "[P3] Top of Record original collection was clipped by the tight export viewport.",
+    "baseRevision": "58f129ca247b1374cfee5d79013dc98f5a370b9c",
+    "previousPdfHash": "dc45ef784bf9bae7403dd902185a44de3f044bc8cb99785810abe07ab8e51ef3",
+    "pdfHash": "cfb5e0d273055c370c2d546c8240e9b14bc97dc799d04e6d06863cbcd4bcd7ea",
+    "bpmnSourceHash": "4fcb75985ade77710c83983008d35f63cd26ce12bc539d277f8ead430bc10792",
+    "command": "npx --yes bpmn-to-image@0.10.0 --min-dimensions=2400x800 --title='P5 Corrective fulfilment' bpmn/corrective_fulfilment.bpmn:bpmn/corrective_fulfilment.pdf",
+    "result": "One-page PDF rendered at 2400 pixels and inspected in full and at collection-task detail; border, icon and text are visible with top margin.",
+    "scope": "PDF viewport/export only. BPMN XML, application, DCR rules and execution logs unchanged; recorded live/local/external results retain their original tested revision and hashes. No new live run or external conformance check needed."
   }
 }
