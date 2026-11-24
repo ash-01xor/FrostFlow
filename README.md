@@ -19,7 +19,7 @@ P1 reserves stock and dispatches shipments. P2 tracks transport and releases the
 
 Siddhi evaluates transport and container telemetry. Optional TomTom traffic ETAs and Open-Meteo current conditions provide external context. P4 uses a local DCR engine by default; dcrgraphs.net repository mode is also supported.
 
-P5 consumes applied P4 replacement/return decisions, books original-goods collection and reuses P1–P3 for linked replacements. Replacement success requires collection and stock admission of the new goods; rejection/cancellation produces a failed outcome. P6 records claimable loss and tracks supplier claims through settlement or rejection. Automatic cooling/recovery integration and an external physical simulator remain future work.
+P5 consumes applied P4 replacement/return decisions, books original-goods collection and reuses P1–P3 for linked replacements. Replacement success requires collection and stock admission of the new goods; rejection/cancellation produces a failed outcome. P6 records claimable loss and tracks supplier claims through settlement or rejection. The cooling/recovery loop is in progress ([issue #17](https://github.com/ash-01xor/FrostFlow/issues/17), [draft contract](docs/P4-COOLING-CONTRACT.md)): P4's side is implemented and tested offline; the simulator/Siddhi side is pending. An external physical simulator remains future work.
 
 ## Run locally
 

@@ -47,7 +47,7 @@ sequenceDiagram
 | R8 | After assessment exactly one decision; afterwards no new checks or cooling requests | `DecideRelease`, `DecideReplace`, `DecideReturn` (QualityOfficer) |
 | R9 | Every incident is assessed and closed; closing needs a decision; nothing after closing | `CloseInvestigation` (QualityOfficer) |
 
-All **3 425** reachable markings can reach an accepting marking and every activity can occur (`stage_tests/test_p4.py::P4Graph`). Cooling acknowledgement/failure and recovery evidence are entered manually: cooling/recovery contracts are separate future work.
+All **3 425** reachable markings can reach an accepting marking and every activity can occur (`stage_tests/test_p4.py::P4Graph`). Cooling acknowledgement/failure and recovery evidence come from the simulator and Siddhi under the [draft cooling contract](P4-COOLING-CONTRACT.md) when `P4_COOLING_COMMAND_URL` is set; otherwise (the current default, because the simulator/Siddhi side does not exist yet) they are entered manually and labelled `manual-test`. The graph is unchanged.
 
 ## Contract v1 behaviour (enforced by the service)
 
@@ -65,6 +65,7 @@ All **3 425** reachable markings can reach an accepting marking and every activi
 | Corrective handoff | After quality-status application, the disposition journal, saved P4 decision, one P5 case and `P5DispositionRecorded` outbox are committed together. A failed transaction leaves the pending decision recoverable; retry creates no duplicate corrective work. `RELEASE` and the quality-status test stand-in create none. P4 closure does not wait for P5. |
 | Terminal rejection | Later evidence for a rejected incident (`qualityStatus: REJECTED`, `incidentOpened: false`) is recorded (`LateAlertEvidenceRecorded`) and never reopens admission. |
 | Receiving | Physical receipt releases the vehicle while the hold stays; P3 waits for monitoring finalization; a P4 release never bypasses finalization or inspection. |
+| Cooling loop ([draft contract](P4-COOLING-CONTRACT.md)) | `RequestCoolingAdjustment` creates one command (`P4:COOL:<incidentId>:<n>`) in the same transaction as its journal entry and, with `P4_COOLING_COMMAND_URL` set, a durable outbox message to the Siddhi bridge. Only while monitoring is active; one outstanding command per incident. The simulator's `APPLIED`/`FAILED` result executes `RecordCoolingAcknowledgement`/`RecordCoolingFailure`; no result by `expiresAt` fails the command (`acknowledgement-timeout`). A recovery evaluation is re-checked against the stored readings before `RecordRecoveryEvidence`; refused, late or not-recovered evaluations are journalled only. Recovery never changes quality status and DCR makes a new assessment due. Manual entry of these three activities is refused for integrated commands. |
 
 The registry stays the authority for quality permission and admission. The test stand-in `POST /integrations/p4/quality-status` and CLI option **17** bypass P4; a later P4 decision on an incident they already decided is refused and recorded.
 
@@ -98,6 +99,8 @@ To repeat the check:
 | `POST /quality/incidents/<incidentId>/activities/<Activity>` | `{"actor", "reason" (decisions), "note", "eventId" (optional, idempotent external input; reuse with different details → 409)}`. 409 with `enabled` when DCR does not enable it; 409 with `reassessmentRequired` for a refused disposition; 409 while new evidence is still being added to the DCR case; 503 while a disposition is pending retry |
 | `POST /quality/incidents/<incidentId>/sync` | Retry case opening, queued integration events or a pending decision |
 | `GET /shipments/<shipmentId>/quality` | `qualityStatus`, `qualityIncidentId`, `evidenceVersion` and incident history |
+| `POST /integrations/p4/cooling-result` | Simulator result for a cooling command (`Idempotency-Key` = `resultId`); see the [draft contract](P4-COOLING-CONTRACT.md#2-result-coolingcommandresult-simulator--p4) |
+| `POST /integrations/p4/recovery` | Siddhi recovery evaluation (`Idempotency-Key` = `recoveryId`); see the [draft contract](P4-COOLING-CONTRACT.md#3-recovery-recoveryevaluated-siddhi--p4) |
 
 Incident IDs contain `:` (`DELAY:...`, `ASSESS:<shipment>:<event>`); URL-encode them. CLI (`tools/demo.py`): **18** changes the simulated container scenario, **19** shows the investigation and executes an enabled activity, **17** is the stand-in that bypasses P4.
 
@@ -108,6 +111,7 @@ Each result applies only to the revision it was produced on; later code changes 
 | Evidence | Tested revision | Where | Status |
 | --- | --- | --- | --- |
 | Offline tests on new monitored shipments (real registry, Zeebe substituted, local DCR engine) | this branch's head | `stage_tests/test_p4.py` | PASS — release after receipt during a hold, replace, return, newer-evidence reassessment with a refused stale decision, duplicate delivery, DCR outage recovery, transient failures, handover fixtures consumed in order, legacy delay messages. Review fixes (PR #12): evidence arriving during `AssessEvidence`, no assessment/decision while evidence is being added, release not granted when the DCR decision fails, lost DCR response reconciled, definite DCR refusal, registry refusal after the DCR decision (new case), conflicting `eventId` reuse, empty `P4_INCIDENT_URL`, crash after the DCR decision and after the registry write, lost DCR answers for `CloseInvestigation`, `AssessEvidence` and `OpenIncident` |
+| Cooling loop, P4 side (issue #17): integrated command, receipt vs application, duplicate/conflicting/wrong-session results, lost ack timeout, late ack without recovery, simulator failure and definite refusal, recovery re-checked against stored readings (before application, one reading, criteria, stale, above threshold, gap), receipt during an in-flight command, restart, labelled manual-test input | this branch's head | `stage_tests/test_p4_cooling.py` | PASS offline (simulator and Siddhi messages posted by the test). Not run live: the simulator/Siddhi side does not exist yet |
 | dcrgraphs.net simulator, 4 manual runs + blocked actions | graph only (unchanged) | `compliance/p4/dcrgraphs-simulation-log.xes`, `compliance/p4/screenshots/` | PASS (run 4 intentionally partial) |
 | Synthetic forbidden traces (9) | graph only | `compliance/p4/invalid-traces.json` | all rejected |
 | Combined foundation/P4 live run (4 scenarios on monitored shipments; Zeebe 8.8.0, Siddhi, **P4 in the dcrgraphs.net repository**, graph `2015919`) | `35d154a` (final PR #12 code, both review passes) | `stage_tests/check_p4_investigation.py` → `compliance/p4/execution-log.xes` | PASS, run `ed88d16d` (454 s, fresh `p4-04` data, simulations `2110252`–`2110255`): release → admitted (2), replace/return → rejected (2); receipt released the vehicle while held in all four; monitoring finalized; forbidden actions refused; run 4 refused the decision until version 2 was reassessed; 4 traces valid and accepting |
@@ -142,5 +146,5 @@ Every case checks that receipt released the vehicle while quality was still held
 
 ## Still to do
 
-- Cooling-command/recovery contracts (Siddhi) and the external physical simulator remain future work. P6 supplier claims are implemented separately; see [the run guide](RUNNING.md#p6-supplier-claims).
+- Cooling loop ([issue #17](https://github.com/ash-01xor/FrostFlow/issues/17)): agree the [draft contract](P4-COOLING-CONTRACT.md) with Rahul; his simulator/Siddhi side, a live run with real acknowledgement/recovery and refreshed P4 evidence remain. The external physical simulator remains future work. P6 supplier claims are implemented separately; see [the run guide](RUNNING.md#p6-supplier-claims).
 - P5 now consumes applied `REPLACE`/`RETURN` decisions; its live/local/external results are in the [P5 guide](P5-CORRECTIVE-FULFILMENT.md). This branch’s P5 acceptance uses local DCR. Earlier full-stack repository-mode runs retain their recorded revisions above.

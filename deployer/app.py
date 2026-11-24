@@ -5,6 +5,7 @@ import math
 import os
 import re
 import threading
+import urllib.error
 from datetime import datetime, timezone
 
 import grpc
@@ -156,6 +157,8 @@ def health():
             "p3ArrivalNotification": "enabled" if os.getenv("P3_ARRIVAL_URL") else "queued-awaiting-endpoint",
             "p4IncidentHandoff": "enabled" if os.getenv("P4_INCIDENT_URL") else "queued-awaiting-p4",
             "p4DcrEngine": current_dcr().mode,
+            "p4CoolingCommands": "siddhi-command-bridge" if os.getenv("P4_COOLING_COMMAND_URL")
+            else "manual-test-input",
         },
     ), 200 if ready.is_set() else 503
 
@@ -967,12 +970,43 @@ async def deliver_messages():
                                        message["messageId"], error)
                 else:
                     registry.message_result(message["messageId"])
+        await deliver_cooling_commands()
         try:
             # P4: retry DCR cases or dispositions that could not complete earlier.
             await asyncio.to_thread(quality.retry_unfinished)
         except Exception as error:
             app.logger.warning("P4 retry pending: %s", error)
         await asyncio.sleep(1)
+
+
+async def deliver_cooling_commands():
+    """P4 cooling commands -> Siddhi command bridge (docs/P4-COOLING-CONTRACT.md).
+
+    A 200 answer is receipt of the command, not its application: the simulator's
+    APPLIED/FAILED result arrives separately at /integrations/p4/cooling-result. A
+    definite refusal (HTTP 400/404/409/422) fails the command; other errors are retried
+    with the same commandId until P4 times the command out.
+    """
+    url = os.getenv("P4_COOLING_COMMAND_URL")
+    if not url:
+        return
+    for message in registry.pending_messages(destination="p4-cooling-command"):
+        command_id = message["messageId"]
+        try:
+            response = await asyncio.to_thread(
+                post_json, url, message["variables"], {"Idempotency-Key": command_id}, 15)
+            await asyncio.to_thread(quality.cooling_command_delivered, command_id, response)
+        except urllib.error.HTTPError as error:
+            if error.code in (400, 404, 409, 422):
+                await asyncio.to_thread(quality.cooling_command_refused, command_id,
+                                        f"HTTP {error.code}: {error.reason}")
+            else:
+                registry.message_result(command_id, str(error))
+        except Exception as error:
+            registry.message_result(command_id, str(error))
+            app.logger.warning("cooling command %s pending: %s", command_id, error)
+        else:
+            registry.message_result(command_id)
 
 
 async def p6_assemble_evidence(claimId, job: Job):

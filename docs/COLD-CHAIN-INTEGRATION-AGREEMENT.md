@@ -78,7 +78,7 @@ The Python integration service delivers these messages to the relevant engine or
 | `ReceiptAcknowledged` | P3 → P2 | Recipient, quantity received, receipt time | Allow transport completion; no quality release is implied. |
 | `TemperatureExcursionDetected` | Siddhi → P4 integration | Pattern start/end, temperature evidence | Establish hold, then open/update investigation. |
 | `DeliveryRiskDetected` | Siddhi → P2 and P4 integration | Latest ETA, deadline, supporting updates | Request dispatcher decision and establish quality assessment/hold. |
-| `RecoveryVerified` | Siddhi → P4 | Incident, cooling command, stable-reading interval | Add evidence; do not automatically release goods. |
+| `RecoveryVerified` (draft name `RecoveryEvaluated`) | Siddhi → P4 | Incident, cooling command, stable-reading interval | Add evidence; do not automatically release goods. Draft fields and P4 checks: [P4 cooling contract](P4-COOLING-CONTRACT.md). |
 | `DispositionRecorded` | P4 → P3 and P5 | Incident, decision, officer, reason, evidence references | P3 receives `QualityStatusChanged` through `accept_quality_status`. On branch `P5`, journalling the applied `REPLACE`/`RETURN` decision also atomically creates one corrective case and queues `P5DispositionRecorded`; the deployed P5 message-start consumer checks that authorization. `RELEASE` and the quality-status test stand-in create no corrective work. |
 | `StockAdmitted` | P3 → shared log; P5 when replacement | Admission time and receiver; original and parent-corrective links | Admission and its `P5ReplacementOutcome` outbox are atomic; P5 validates the actual P3 journal event. |
 | `GoodsRejected` | P3 → shared log; P5 when replacement | Incident, reason and parent-corrective link | Inspection and quality rejection atomically queue `P5ReplacementOutcome`; neither can fulfil a replacement successfully. |
@@ -246,6 +246,8 @@ If a problem is discovered after admission, record a late-discovery exception an
 
 Both commands pass through Siddhi. The acknowledgement includes command ID, shipment, incident if relevant, and success/failure. Failed commands must not count as completed actions. Repeated command delivery returns the existing acknowledgement without applying the action again.
 
+`AdjustCooling` is specified in the draft [P4 cooling contract](P4-COOLING-CONTRACT.md) (issue #17): command `CoolingAdjustmentRequested`, simulator result `CoolingCommandResult` and recovery `RecoveryEvaluated`. Receipt of a command is not acknowledgement of its application.
+
 An acknowledgement proves the command was applied, not that the problem recovered. Stable readings are evidence for a human disposition, not automatic permission to use goods. TomTom and Open-Meteo supply read-only information; the simulator performs the physical response.
 
 ## 6. Repeated events, unavailable data, and test runs
@@ -292,6 +294,10 @@ The [foundation specification](PRE-P4-FOUNDATION.md) defines the approved profil
 Loading verification starts a session with an immutable profile. Physical receipt closes it at a final sequence and promptly sends P2 acknowledgement. `p3-finalize-monitoring` keeps P3 at an explicit service task until evaluation reaches closure, or a 20-second timeout establishes a durable uncertainty hold. Admission rechecks closed/finalized monitoring and current quality permission in one transaction. Legacy shipments without a snapshot are labelled legacy/unmonitored and retain their original engine model.
 
 See [Abid’s P4 foundation handover](P4-FOUNDATION-HANDOVER.md) for intake, durable acknowledgements, assessed evidence versions, fixtures and reintegration requirements. The replacement P4 PR implements that boundary; its behaviour is summarised in the [P4 guide](P4-QUALITY-INVESTIGATION.md#contract-v1-behaviour-enforced-by-the-service).
+
+## P4 cooling/recovery contract (draft, issue #17)
+
+The [draft contract](P4-COOLING-CONTRACT.md) defines the command, result and recovery messages, identities, timeout, recovery criteria and refusal behaviour. It still needs agreement between Abid (P4) and Rahul (simulator/Siddhi), with review by Ashvanth and Arunima. P4's side is implemented and tested offline (`P4_COOLING_COMMAND_URL`, `POST /integrations/p4/cooling-result`, `POST /integrations/p4/recovery`); the simulator applying commands and Siddhi recovery detection are not implemented, so the Compose default keeps labelled manual-test cooling inputs.
 
 ## P5 corrective fulfilment contract
 

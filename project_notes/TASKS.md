@@ -20,7 +20,7 @@
 | P4 Quality investigation (DCR) | Abid | IMPLEMENTED; merged in PR #12; review fixes pass offline; combined live run `ed88d16d` passed on the final code with P4 in the dcrgraphs.net repository; owner ProcessDoctor check passed for that log | [P4 guide](../docs/P4-QUALITY-INVESTIGATION.md); PR #12 merged as `70d1a1b`; merged-main smoke passed |
 | P5 Corrective fulfilment | Daniel | IMPLEMENTED; offline/live/local replay/external conformance pass | [P5 guide](../docs/P5-CORRECTIVE-FULFILMENT.md); PR #14 merged as `b3f6102`; latest integrated-main smoke passed at `35d2d0b` |
 | P6 Supplier claim resolution | Sai Shashank Maktala | IMPLEMENTED / VERIFIED; 140-test suite and five independent live claims pass; original external conformance retains its recorded scope | PR #15 merged as `35d2d0b`; exact merged-main smoke passed |
-| Shared CEP, APIs, simulator, logging | Unassigned | PARTLY IMPLEMENTED | ETA/container CEP, weather, shared durable journals and JSON/XES exports implemented; cooling/recovery and external simulator integration pending |
+| Shared CEP, APIs, simulator, logging | Unassigned (cooling loop: Abid/Rahul per issue #17) | PARTLY IMPLEMENTED | ETA/container CEP, weather, shared durable journals and JSON/XES exports implemented; cooling loop: P4 side implemented offline, simulator/Siddhi side pending; external simulator integration pending |
 | Compliance and submission | All; coordinator unassigned | TODO | Models + real execution logs |
 
 ## Merged P4 checkpoint — 21 November 2026
@@ -191,7 +191,10 @@ Owner: Abid. Replacement PR on `feat/p4-foundation-integration` (restore = rever
 - [x] ProcessDoctor (owner, 19 Nov): live log `fd021988` (now historical) against `compliance/p4/rules.xml` 4/4 conforming, 0 violations, coverage 100. The compliance model is the executed graph without roles: ProcessDoctor reports cost Infinity against the role-assigned graph.
 - [x] Full-stack run with P4 in repository mode: live runs `d2558070` and `ed88d16d`.
 - [x] P5 consumes applied `REPLACE`/`RETURN` dispositions transactionally; `RELEASE` creates no corrective work.
-- [ ] Cooling command through Siddhi and recovery evidence contracts (shared CEP work; owner unconfirmed).
+- [ ] Cooling loop ([issue #17](https://github.com/ash-01xor/FrostFlow/issues/17), owners Abid/Rahul, verification Ashvanth): agree the [draft contract](../docs/P4-COOLING-CONTRACT.md) with Rahul (and Arunima for the P3 boundary).
+- [x] P4 side implemented on `feat/p4-cooling-loop`: durable command per `RequestCoolingAdjustment` (outbox, stable `commandId`), receipt vs application kept apart, simulator result receiver, timeout → failure, recovery receiver that re-checks stored readings, labelled manual-test input; 10 offline regressions in `stage_tests/test_p4_cooling.py` (150 tests pass).
+- [ ] Rahul: simulator applies commands to future readings and returns results; Siddhi recovery query and durable delivery (issue #17).
+- [ ] Live run with real acknowledgement/recovery, then refresh P4 evidence (log, local replay, ProcessDoctor) — pending both sides.
 
 ## P5 — Corrective fulfilment
 
@@ -222,7 +225,7 @@ Owner: Abid. Replacement PR on `feat/p4-foundation-integration` (restore = rever
 
 - [x] Implement/document the current ETA rule: three distinct consecutive fresh late observations, 30-second freshness and 180-second window.
 - [x] Document approved temperature assessment cadence, persistence, gap limits, freshness and units.
-- [ ] Agree cooling/recovery settings as part of real P4 work.
+- [ ] Agree cooling/recovery settings as part of real P4 work (proposed in the [draft contract](../docs/P4-COOLING-CONTRACT.md), not yet agreed).
 - [x] Implement P1–P3 envelope validation, transactional handoffs and event/delivery/command deduplication.
 - [x] Extend transactional contracts/retry checks to real P4 and P5.
 - [x] Extend transactional start/response contracts and exact/conflicting retry checks to P6; independent live claims verify their expected outcomes.

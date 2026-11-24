@@ -117,7 +117,7 @@ P1 is owned by Ashvanth, P2 by Rahul Shanbhag and P3 by Arunima Garg. Abid owns 
 
 ### Abid — P4: Quality incident investigation · DCR
 
-Abid is the confirmed P4 owner. **Status:** restored and adapted to the foundation contract v1 in the replacement PR — [P4 guide](P4-QUALITY-INVESTIGATION.md), [`deployer/quality.py`](../deployer/quality.py), [`dcr/`](../dcr/), [`compliance/p4/`](../compliance/p4/). Offline tests, the dcrgraphs.net simulation, the dcrgraphs.net API check and the combined live run `ed88d16d` (P4 executing in the dcrgraphs.net repository, on the final PR #12 code) pass, and ProcessDoctor reports 4/4 conforming variants (0 violations) for its log. Cooling/recovery inputs are manual until their contracts exist.
+Abid is the confirmed P4 owner. **Status:** restored and adapted to the foundation contract v1 in the replacement PR — [P4 guide](P4-QUALITY-INVESTIGATION.md), [`deployer/quality.py`](../deployer/quality.py), [`dcr/`](../dcr/), [`compliance/p4/`](../compliance/p4/). Offline tests, the dcrgraphs.net simulation, the dcrgraphs.net API check and the combined live run `ed88d16d` (P4 executing in the dcrgraphs.net repository, on the final PR #12 code) pass, and ProcessDoctor reports 4/4 conforming variants (0 violations) for its log. Cooling/recovery: P4's side of the [draft contract](P4-COOLING-CONTRACT.md) (issue #17) is implemented and tested offline; until the simulator/Siddhi side exists, acknowledgement/recovery inputs are entered manually and labelled `manual-test`.
 
 **Build:** open incident → review evidence → request/complete additional checks if needed → decide release, replacement, or return → close investigation.
 
@@ -174,7 +174,7 @@ Each person also models their process's compliance rules as a DCR graph and chec
 | Combined transport risk (implemented assessment) | Current-revision persistent fresh late ETA, three rising readings over 10 s (≥0.5°C rise), eligible outdoor temperature ≥30°C | Urgent assessment, coalescing/escalating the current incident |
 | Missing container data (implemented watchdog) | No valid reading for 20 s, including after restart | Assessment hold; missing data never means normal |
 | Delivery risk | Repeated fresh ETA updates predict arrival after the delivery deadline | Start delay handling and quality assessment |
-| Recovery (planned automation; P4 currently records manual acknowledgement/evidence) | After an acknowledged cooling command, readings remain within the configured range for a configured duration | Send recovery evidence to the investigation; officer still decides disposition |
+| Recovery (in progress, issue #17: P4 receiver implemented, Siddhi detection pending; manual-test input until then) | After an acknowledged cooling command, readings remain within the configured range for a configured duration | Send recovery evidence to the investigation; officer still decides disposition |
 
 Missing readings cannot establish normal conditions or recovery. Failed/stale API updates must be shown as unavailable. Weather is supporting evidence, not container temperature or an automatic rejection rule.
 

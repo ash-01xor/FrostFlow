@@ -629,7 +629,7 @@ class Registry(MonitoringRegistry, CorrectiveRegistry, ClaimRegistry):
             if data["status"] == "ACKNOWLEDGED":
                 return
             status = "PENDING" if error else (
-                "ACKNOWLEDGED" if data.get("destination") in ("p3-http", "siddhi-http", "p4-http", "container-siddhi") else "PUBLISHED"
+                "ACKNOWLEDGED" if data.get("destination") in ("p3-http", "siddhi-http", "p4-http", "container-siddhi", "p4-cooling-command") else "PUBLISHED"
             )
             data.update(status=status, lastError=error)
             db.execute(

@@ -100,7 +100,7 @@ Operate displays engine execution. The terminal represents the person submitting
 
 The dataset must be prepared before recording/presenting. The menu preserves existing data and does not reset containers or reservations. A used dataset may have unavailable vehicles even if stock remains; use the isolated-dataset instructions below to rehearse again.
 
-For the final **three-minute** project demo, reserve roughly 25 seconds for preparation. Build one connected story as later parts become available: dispatch → arrival/receipt → temperature incident → investigation/hold → authorised resolution → corrective work/claim → compliance results. Show process behaviour and evidence at each transition. P3 receiving, Abid’s P4 investigation (CLI **19**) and P5 corrective fulfilment (CLI **20**) are implemented. P6 claims are implemented through the [claim API](#p6-supplier-claims); automatic cooling/recovery remains planned.
+For the final **three-minute** project demo, reserve roughly 25 seconds for preparation. Build one connected story as later parts become available: dispatch → arrival/receipt → temperature incident → investigation/hold → authorised resolution → corrective work/claim → compliance results. Show process behaviour and evidence at each transition. P3 receiving, Abid’s P4 investigation (CLI **19**) and P5 corrective fulfilment (CLI **20**) are implemented. P6 claims are implemented through the [claim API](#p6-supplier-claims); automatic cooling/recovery is in progress (P4 side implemented offline, simulator/Siddhi side pending; [draft contract](P4-COOLING-CONTRACT.md)).
 
 ### P3 compliance evidence
 
@@ -521,7 +521,9 @@ The runner needs only the Python standard library. It runs four investigations o
 3. Delay → additional check → return.
 4. Delay → assessed → new container evidence → refused decision → reassessment → release.
 
-Each case checks that physical receipt released the vehicle while quality was held, that monitoring finalized, that forbidden actions were refused (409) and the P3 outcome. It takes roughly 15–20 minutes. The builder writes `compliance/p4/execution-log.xes` and the live section of `compliance/p4/verification.json`. If `.env` holds `DCR_*` credentials, P4 executes in the dcrgraphs.net repository (`/health` → `p4DcrEngine: dcr-repository`); otherwise in the local engine. Recorded result: run `ed88d16d` passed on 19 November 2026 at `35d154a` (454 s, macOS arm64, fresh `p4-04` data, P4 in the dcrgraphs.net repository, graph `2015919`; 4 traces valid and accepting). Earlier runs `d2558070` (`3576812`) and `fd021988` (local engine, `95e4a85`) are historical.
+Each case checks that physical receipt released the vehicle while quality was held, that monitoring finalized, that forbidden actions were refused (409) and the P3 outcome. The runner enters the cooling acknowledgement/failure and recovery evidence by hand, so run it with `P4_COOLING_COMMAND_URL` empty (the Compose default); those entries are journalled as `inputMode: manual-test`. It takes roughly 15–20 minutes.
+
+**P4 cooling loop (issue #17, P4 side only):** with `P4_COOLING_COMMAND_URL` set, `RequestCoolingAdjustment` queues a durable `CoolingAdjustmentRequested` command (outbox destination `p4-cooling-command`, `Idempotency-Key` = `commandId`); the simulator's result arrives at `POST /integrations/p4/cooling-result` and Siddhi's recovery evaluation at `POST /integrations/p4/recovery`. A command without a result after `P4_COOLING_ACK_TIMEOUT_SECONDS` (default 45) fails. `/health` reports `integrations.p4CoolingCommands` (`siddhi-command-bridge` or `manual-test-input`). The simulator/Siddhi side is not implemented yet, so leave the URL empty for live runs; see the [draft contract](P4-COOLING-CONTRACT.md). Offline: `.venv/bin/python -m unittest stage_tests/test_p4_cooling.py -v`. The builder writes `compliance/p4/execution-log.xes` and the live section of `compliance/p4/verification.json`. If `.env` holds `DCR_*` credentials, P4 executes in the dcrgraphs.net repository (`/health` → `p4DcrEngine: dcr-repository`); otherwise in the local engine. Recorded result: run `ed88d16d` passed on 19 November 2026 at `35d154a` (454 s, macOS arm64, fresh `p4-04` data, P4 in the dcrgraphs.net repository, graph `2015919`; 4 traces valid and accepting). Earlier runs `d2558070` (`3576812`) and `fd021988` (local engine, `95e4a85`) are historical.
 
 ## Persistence, isolated checks and troubleshooting
 
@@ -560,7 +562,7 @@ For disposable data only, `docker compose down -v` removes that project's engine
 - **502 on creation:** engine-start outcome uncertain; inspect engine/logs before retrying. The registry entry is retained.
 - **A pending command/handoff does not advance:** check `docker compose logs communication` and Operate for publication/worker incidents. Published messages expire after 24 hours if unconsumed; recovery is manual.
 
-One communication instance is supported. Authenticated users, stock procurement, the shared logger and cooling/recovery contracts remain outside this increment. P3 receipt/admission and the durable delivery-risk quality hold are implemented. P1 external conformance checking is recorded above.
+One communication instance is supported. Authenticated users, stock procurement and the shared logger remain outside this increment; the cooling/recovery loop has a [draft contract](P4-COOLING-CONTRACT.md) with only its P4 side implemented. P3 receipt/admission and the durable delivery-risk quality hold are implemented. P1 external conformance checking is recorded above.
 
 
 ## Container monitoring foundation

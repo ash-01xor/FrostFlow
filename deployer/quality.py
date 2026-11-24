@@ -27,6 +27,8 @@ See docs/P4-FOUNDATION-HANDOVER.md and docs/P4-QUALITY-INVESTIGATION.md.
 - Officer requests with an eventId are idempotent: identical retries return the original
   outcome, reuse with a different activity, actor, reason or note is a 409 conflict.
 - The registry stays the authority for quality permission and admission.
+- Cooling commands, simulator results and Siddhi recovery evidence: see p4_cooling.py
+  and docs/P4-COOLING-CONTRACT.md.
 """
 
 import json
@@ -36,6 +38,7 @@ from datetime import datetime
 from flask import Blueprint, jsonify, request
 
 from dcr_client import DCRRefused, DCRUnavailable
+from p4_cooling import INTEGRATION_RESULTS, CoolingMixin
 from registry import Conflict, Registry, now
 
 # DCR event id -> role. Event ids are also the logged activity names.
@@ -246,7 +249,7 @@ def new_incident(incident_id, shipment_id, dcr):
     )
 
 
-class QualityService:
+class QualityService(CoolingMixin):
     def __init__(self, get_registry, get_dcr):
         self.get_registry = get_registry
         self.get_dcr = get_dcr
@@ -363,7 +366,8 @@ class QualityService:
                         incident["dcrCaseId"] = case
                         save_incident(db, incident)
                 while incident["pendingSystemEvents"]:
-                    activity = incident["pendingSystemEvents"][0]
+                    queued = incident["pendingSystemEvents"][0]
+                    activity = queued["activity"] if isinstance(queued, dict) else queued
                     enabled = {e["id"] for e in self.dcr.events(case)["events"] if e["enabled"]}
                     # An attempt whose DCR answer was lost: if DCR no longer enables the
                     # event, that attempt executed it (e.g. OpenIncident excludes itself).
@@ -380,9 +384,18 @@ class QualityService:
                         incident["pendingSystemEvents"].pop(0)
                         incident["systemEventAttempt"] = None
                         record = Registry.read(db, incident["shipmentId"])
-                        journal(db, record, incident,
-                                activity if activity in enabled or executed
-                                else "LateAlertEvidenceRecorded")
+                        ran = activity in enabled or executed
+                        if isinstance(queued, dict):
+                            journal(db, record, incident,
+                                    activity if ran else queued["late"],
+                                    payload=queued.get("payload"),
+                                    event_id=queued["journalId"] if ran
+                                    else f"{queued['journalId']}:late",
+                                    input_mode=queued.get("inputMode"),
+                                    source=queued.get("source"))
+                        else:
+                            journal(db, record, incident,
+                                    activity if ran else "LateAlertEvidenceRecorded")
                         save_incident(db, incident)
                 if incident["status"] in ("OPENING", "DCR_UNAVAILABLE"):
                     with self.registry.transaction() as db:
@@ -406,7 +419,9 @@ class QualityService:
                 return read_incident(db, incident_id)
 
     def retry_unfinished(self):
-        """Background retry for cases waiting on DCR or on a pending decision."""
+        """Background retry for cases waiting on DCR or on a pending decision, and the
+        timeout of cooling commands without a simulator result."""
+        self.expire_cooling_commands()
         with self.registry.transaction() as db:
             ensure_schema(db)
             waiting = [
@@ -414,6 +429,7 @@ class QualityService:
                 for incident in (json.loads(r[0]) for r in db.execute("SELECT data FROM incidents"))
                 if incident["status"] in ("OPENING", "DCR_UNAVAILABLE")
                 or incident.get("pendingDecision") or incident.get("pendingActivity")
+                or (incident["status"] == "OPEN" and incident.get("pendingSystemEvents"))
             ]
         for incident_id in waiting:
             self.sync(incident_id)
@@ -607,11 +623,13 @@ class QualityService:
                 raise Blocked(activity, enabled)
             if activity in DECISIONS:
                 return self._decide(incident, activity, actor, reason, note, journal_id)
+            cooling_mode = self._check_cooling_request(incident, activity)
             with self.registry.transaction() as db:
                 incident = read_incident(db, incident_id)
                 incident["pendingActivity"] = dict(
                     activity=activity, actor=actor, reason=reason, note=note,
-                    journalId=journal_id, seenVersion=seen_version, dcrCaseId=case)
+                    journalId=journal_id, seenVersion=seen_version, dcrCaseId=case,
+                    coolingMode=cooling_mode)
                 save_incident(db, incident)
             return self._execute_activity(incident_id, case, activity)
 
@@ -651,8 +669,12 @@ class QualityService:
                 payload["assessedEvidenceVersion"] = seen
                 if newer:
                     payload["newerEvidenceArrived"] = True
+            input_mode = "manual"
+            if activity == "RequestCoolingAdjustment" or activity in INTEGRATION_RESULTS:
+                input_mode = self._record_cooling_activity(db, record, incident, activity,
+                                                           pending, payload)
             event = journal(db, record, incident, activity, pending["actor"], payload,
-                            event_id=pending["journalId"], input_mode="manual")
+                            event_id=pending["journalId"], input_mode=input_mode)
             if activity == "CloseInvestigation":
                 incident.update(status="CLOSED", closedAt=event["occurredAt"])
             incident.update(pendingActivity=None, lastError=None)
@@ -803,6 +825,18 @@ def create_blueprint(service):
     def handoff():
         """Foundation outbox consumer; internal, unauthenticated demo route."""
         return jsonify(service.accept_handoff(
+            body(), request.headers.get("Idempotency-Key"))), 200
+
+    @bp.post("/integrations/p4/cooling-result")
+    def cooling_result():
+        """Simulator result for a P4 cooling command (docs/P4-COOLING-CONTRACT.md)."""
+        return jsonify(service.accept_cooling_result(
+            body(), request.headers.get("Idempotency-Key"))), 200
+
+    @bp.post("/integrations/p4/recovery")
+    def recovery():
+        """Siddhi recovery evaluation for a P4 cooling command."""
+        return jsonify(service.accept_recovery(
             body(), request.headers.get("Idempotency-Key"))), 200
 
     @bp.get("/quality/incidents/<incident_id>")
